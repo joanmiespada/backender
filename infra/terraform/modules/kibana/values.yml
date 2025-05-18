@@ -1,0 +1,6 @@
+replicaCount: 1
+
+elasticsearchHosts: http://elasticsearch.infra.svc.cluster.local:9200
+
+service:
+  type: ClusterIP

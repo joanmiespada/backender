@@ -1,0 +1,13 @@
+replicas: 1
+
+volumeClaimTemplate:
+  accessModes: [ "ReadWriteOnce" ]
+  resources:
+    requests:
+      storage: 1Gi
+
+esConfig:
+  elasticsearch.yml: |
+    xpack.security.enabled: false
+    network.host: 0.0.0.0
+    discovery.type: single-node

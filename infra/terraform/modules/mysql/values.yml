@@ -1,0 +1,12 @@
+auth:
+  rootPassword: root
+  database: mydb
+  username: user
+  password: pass
+
+primary:
+  persistence:
+    enabled: false
+
+secondary:
+  replicaCount: 0

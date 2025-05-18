@@ -1,0 +1,21 @@
+auth:
+  adminUser: admin
+  adminPassword: admin
+
+postgresql:
+  enabled: false
+
+externalDatabase:
+  host: postgresql.infra.svc.cluster.local
+  port: 5432
+  user: keycloak
+  password: keycloak
+  database: keycloak
+
+proxyAddressForwarding: true
+
+service:
+  type: ClusterIP
+
+persistence:
+  enabled: false

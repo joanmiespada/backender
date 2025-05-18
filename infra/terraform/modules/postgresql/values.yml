@@ -1,0 +1,15 @@
+auth:
+  postgresPassword: rootpassword
+
+initdbScripts:
+  init.sql: |
+    CREATE USER keycloak WITH PASSWORD 'keycloak';
+    CREATE DATABASE keycloak OWNER keycloak;
+
+    CREATE USER unleash WITH PASSWORD 'unleash';
+    CREATE DATABASE unleash OWNER unleash;
+
+
+primary:
+  persistence:
+    enabled: false

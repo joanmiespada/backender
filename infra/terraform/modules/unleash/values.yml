@@ -1,0 +1,19 @@
+# Disable built-in PostgreSQL
+postgresql:
+  enabled: false
+
+# Use external PostgreSQL (from the shared module)
+databaseUrl: postgres://unleash:unleash@postgresql.infra.svc.cluster.local:5432/unleash?sslmode=disable
+
+# Optional basic config
+extraEnv:
+  UNLEASH_LOG_LEVEL: info
+  NODE_ENV: development
+
+# Ingress/Service
+service:
+  type: ClusterIP
+
+# Disable persistence for local/dev
+persistence:
+  enabled: false

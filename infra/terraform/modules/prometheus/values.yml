@@ -1,0 +1,14 @@
+kubelet:
+  enabled: false
+
+prometheus:
+  persistence:
+    enabled: false
+  service:
+    type: ClusterIP
+
+alertmanager:
+  enabled: false
+
+grafana:
+  enabled: false
