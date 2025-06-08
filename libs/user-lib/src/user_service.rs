@@ -5,6 +5,7 @@ use crate::entities::{User, Role};
 use crate::repository::{RoleRepository, UserRepository, UserRoleRepository};
 use sqlx::Error;
 
+#[derive(Debug, Clone)]
 pub struct UserService {
     pub user_repo: UserRepository,
     pub role_repo: RoleRepository,

@@ -2,6 +2,7 @@ use sqlx::{query, query_as, MySqlPool, Error};
 use uuid::Uuid;
 use crate::repository::models::RoleRow;
 
+#[derive(Debug, Clone)]
 pub struct RoleRepository {
     pub pool: MySqlPool,
 }

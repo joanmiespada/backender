@@ -3,16 +3,22 @@ name = "user-api"
 version = "0.1.0"
 edition = "2021"
 
+
+[[bin]]
+name = "user-api"
+path = "src/main.rs"
+
 [dependencies]
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1", features = ["full"] }
 axum = "0.8.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 uuid = { version = "1", features = ["v4", "serde"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
+utoipa = { version = "5.3.1", features = ["axum_extras", "uuid"] }
+utoipa-swagger-ui = "9.0.2"
 
-# Local domain logic dependency
 user-lib = { path = "../../libs/user-lib" }
 
 [dev-dependencies]

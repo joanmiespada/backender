@@ -2,6 +2,7 @@
 
 use sqlx::{query, Error, MySqlPool};
 
+#[derive(Debug, Clone)]
 pub struct UserRoleRepository {
     pub pool: MySqlPool,
 }

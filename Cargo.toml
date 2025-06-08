@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    #"apps/user-api",
+    "apps/user-api",
     "libs/user-lib",
     "apps/backcli",
 ]
