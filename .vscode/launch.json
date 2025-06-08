@@ -1,0 +1,50 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'user_lib'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=user-lib"
+                ],
+                "filter": {
+                    "name": "user_lib",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "RUST_BACKTRACE": "1"
+            },
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'user_service_test'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=user_service_test",
+                    "--package=user-lib"
+                ],
+                "filter": {
+                    "name": "user_service_test",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "RUST_BACKTRACE": "1"
+            },
+        }
+    ]
+}

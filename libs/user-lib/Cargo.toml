@@ -1,0 +1,25 @@
+[package]
+name = "user-lib"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "user_lib"
+path = "src/lib.rs"
+
+[dependencies]
+uuid = { version = "1", features = ["v4", "serde"] }
+serde = { version = "1.0", features = ["derive"] }
+sqlx = { version = "0.8.6", features = ["mysql", "runtime-tokio-native-tls", "macros", "uuid"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+
+[dev-dependencies]
+testcontainers = "0.24"
+testcontainers-modules = { version = "0.12.1", features = ["mysql"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+sqlx = { version = "0.8.6", features = ["mysql", "runtime-tokio-native-tls", "macros" ,"uuid"] }
+uuid = "1"
+
+[build-dependencies]
+dotenvy = "0.15"
+sqlx = { version = "0.8.6", features = ["mysql", "runtime-tokio-native-tls", "macros", "uuid"] }
