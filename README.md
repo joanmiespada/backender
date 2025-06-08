@@ -29,3 +29,11 @@ docker compose -f docker-compose.local.yml up --build
 	•	http://prometheus.127.0.0.1.nip.io
 	•	http://kibana.127.0.0.1.nip.io
 	•	http://traefik.127.0.0.1.nip.io
+
+
+## Command line tool
+
+$backcli is the command line to perform operations with services. For example, for running migrations databases:
+
+DATABASE_URL=mysql://testuser:password@localhost:3306/testdb cargo run -p backcli -- --migrations --user-lib  // execute migrations of user-lib package
+
