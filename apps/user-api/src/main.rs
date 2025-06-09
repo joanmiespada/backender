@@ -21,7 +21,7 @@ use utoipa_swagger_ui::SwaggerUi;
 #[derive(OpenApi)]
 #[openapi(
     paths(create_user, get_user_by_id),
-    components(schemas(CreateUserRequest, User)),
+    components(schemas(CreateUserRequest, UserResponse)),
     tags(
         (name = "users", description = "User management endpoints")
     )
@@ -74,10 +74,20 @@ struct CreateUserRequest {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
-pub struct User {
+pub struct UserResponse {
     pub id: Uuid,
     pub name: String,
     pub email: String,
+}
+
+impl From<User> for UserResponse {
+    fn from(user: User) -> Self {
+        UserResponse {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+        }
+    }
 }
 
 
@@ -86,17 +96,17 @@ pub struct User {
     path = "/users",
     request_body = CreateUserRequest,
     responses(
-        (status = 200, description = "User created successfully", body = User),
+        (status = 200, description = "User created successfully", body = UserResponse),
         (status = 500, description = "Internal server error"),
     )
 )]
 async fn create_user(
     axum::extract::State(user_service): axum::extract::State<UserService>,
     Json(payload): Json<CreateUserRequest>,
-) -> Result<Json<User>, axum::http::StatusCode> {
+) -> Result<Json<UserResponse>, axum::http::StatusCode> {
     user_service.create_user(&payload.name, &payload.email)
         .await
-        .map(Json)
+        .map(|user| Json(UserResponse::from(user)))
         .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)
 }
 
@@ -107,7 +117,7 @@ async fn create_user(
         ("id" = String, Path, description = "User ID (UUID)")
     ),
     responses(
-        (status = 200, description = "User found", body = User),
+        (status = 200, description = "User found", body = UserResponse),
         (status = 404, description = "User not found"),
         (status = 400, description = "Invalid UUID"),
         (status = 500, description = "Internal server error"),
@@ -116,11 +126,11 @@ async fn create_user(
 async fn get_user_by_id(
     axum::extract::Path(id): axum::extract::Path<String>,
     axum::extract::State(user_service): axum::extract::State<UserService>,
-) -> Result<Json<User>, axum::http::StatusCode> {
+) -> Result<Json<UserResponse>, axum::http::StatusCode> {
     match Uuid::parse_str(&id) {
         Ok(parsed_id) => {
             match user_service.get_user(parsed_id).await {
-                Ok(Some(user)) => Ok(Json(user)),
+                Ok(Some(user)) => Ok(Json(UserResponse::from(user))),
                 Ok(None) => Err(axum::http::StatusCode::NOT_FOUND),
                 Err(_) => Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR),
             }
