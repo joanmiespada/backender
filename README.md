@@ -2,18 +2,24 @@
 
 Spin up the full backend shared platform locally.
 
+## Brew dependencies
+
+```bash
+brew install mysql-client
+brew install dnsmasq
+```
+
 ## Included Services
 
 - Redis (cache and stream)
 - MySQL (service DB)
+- phpMyAdmin
 - Keycloak (auth)
 - Unleash (feature toggles)
 - ElasticSearch + Kibana (logs)
 - Prometheus + Grafana (metrics)
+- Postgres as database for dependencies
 
-## Dependencies
-
-brew install dnsmasq
 
 ## Start docker
 

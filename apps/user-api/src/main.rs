@@ -4,8 +4,8 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use tokio;
-use tracing::{info, Level};
-use tracing_subscriber::FmtSubscriber;
+use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
+use tracing_subscriber::EnvFilter;
 use user_lib::{user_service::UserService, util::connect_with_retry};
 use user_lib::repository::role_repository::RoleRepository;
 use user_lib::repository::user_repository::UserRepository;
@@ -32,8 +32,13 @@ struct ApiDoc;
 #[tokio::main]
 async fn main() {
     // Setup tracing subscriber
-    let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::INFO)
+    // Use RUST_LOG if set, otherwise default to INFO for app + DEBUG for HTTP tracing.
+    let filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("info"));
+
+    let subscriber = tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        //.with_max_level(Level::DEBUG)
         .finish();
 
     tracing::subscriber::set_global_default(subscriber)
@@ -53,12 +58,32 @@ async fn main() {
     let app = Router::new()
         .route("/health", get(health_check))
         .route("/users", post(create_user))
-        .route("/users/:id", get(get_user_by_id))
+        .route("/users/{id}", get(get_user_by_id))
         .merge(SwaggerUi::new("/docs").url("/api-doc/openapi.json", ApiDoc::openapi()))
-        .with_state(user_service);
+        .with_state(user_service)
+        // Log one line per request/response at DEBUG (method, path, status, latency)
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(DefaultMakeSpan::new().level(tracing::Level::DEBUG))
+                .on_response(DefaultOnResponse::new().level(tracing::Level::DEBUG)),
+        );
 
-    // Run server
-    let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    // Read port from env (default to 3333)
+    let port: u16 = std::env::var("USER_API_PORT")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(3333);
+
+    let addr = format!("0.0.0.0:{}", port);
+    let public_url = format!("http://127.0.0.1:{}", port);
+
+    let listener = TcpListener::bind(&addr).await.unwrap();
+
+    tracing::info!(
+        "user-api is ready to accept requests at: {}",
+        public_url
+    );
+
     axum::serve(listener, app).await.unwrap();
     
 }
@@ -97,17 +122,33 @@ impl From<User> for UserResponse {
     request_body = CreateUserRequest,
     responses(
         (status = 200, description = "User created successfully", body = UserResponse),
+        (status = 409, description = "Email already exists"),
         (status = 500, description = "Internal server error"),
     )
 )]
 async fn create_user(
     axum::extract::State(user_service): axum::extract::State<UserService>,
     Json(payload): Json<CreateUserRequest>,
-) -> Result<Json<UserResponse>, axum::http::StatusCode> {
-    user_service.create_user(&payload.name, &payload.email)
+) -> Result<Json<UserResponse>, (axum::http::StatusCode, String)> {
+    user_service
+        .create_user(&payload.name, &payload.email)
         .await
         .map(|user| Json(UserResponse::from(user)))
-        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)
+        .map_err(|e| {
+            use user_lib::errors_service::UserServiceError;
+
+            match e {
+                 UserServiceError::EmailAlreadyExists
+                | UserServiceError::RoleNameAlreadyExists
+                | UserServiceError::UserAlreadyHasRole => {
+                    (axum::http::StatusCode::CONFLICT, e.to_string())
+                }
+                _ => (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    e.to_string(),
+                ),
+            }
+        })
 }
 
 #[utoipa::path(

@@ -1,6 +1,6 @@
+use sqlx::{query, MySqlPool};
 
-
-use sqlx::{query, Error, MySqlPool};
+use crate::repository::errors::{map_sqlx_error, UserRepositoryError};
 
 #[derive(Debug, Clone)]
 pub struct UserRoleRepository {
@@ -12,7 +12,7 @@ impl UserRoleRepository {
         Self { pool }
     }
 
-    pub async fn assign_role(&self, user_id: &str, role_id: &str) -> Result<(), Error> {
+    pub async fn assign_role(&self, user_id: &str, role_id: &str) -> Result<(), UserRepositoryError> {
         query(
             r#"
             INSERT INTO user_roles (user_id, role_id)
@@ -22,12 +22,13 @@ impl UserRoleRepository {
         .bind(user_id)
         .bind(role_id)
         .execute(&self.pool)
-        .await?;
+        .await
+        .map_err(map_sqlx_error)?;
 
         Ok(())
     }
 
-    pub async fn unassign_role(&self, user_id: &str, role_id: &str) -> Result<(), Error> {
+    pub async fn unassign_role(&self, user_id: &str, role_id: &str) -> Result<(), UserRepositoryError> {
         query(
             r#"
             DELETE FROM user_roles
@@ -37,7 +38,8 @@ impl UserRoleRepository {
         .bind(user_id)
         .bind(role_id)
         .execute(&self.pool)
-        .await?;
+        .await
+        .map_err(map_sqlx_error)?;
 
         Ok(())
     }

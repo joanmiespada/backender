@@ -1,10 +1,10 @@
 // apps/backcli/src/main.rs
 
 use clap::{Arg, ArgAction, Command};
-use sqlx::{migrate::Migrator, MySqlPool};
-use std::path::Path;
-use std::process;
-use std::sync::Arc;
+use sqlx::MySqlPool;
+
+// NOTE: sqlx::migrate!(...) paths are resolved relative to this crate's directory (apps/backcli)
+static USER_LIB_MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("../../libs/user-lib/migrations");
 
 #[tokio::main]
 async fn main() {
@@ -25,28 +25,34 @@ async fn main() {
         .get_matches();
 
     if matches.get_flag("migrations") {
-        if matches.get_flag("user-lib") {
-            run_user_lib_migrations().await;
+        let result = if matches.get_flag("user-lib") {
+            run_user_lib_migrations().await
         } else {
             // In the future, support more libs here
-            run_user_lib_migrations().await;
+            run_user_lib_migrations().await
+        };
+
+        if let Err(e) = result {
+            eprintln!("{e}");
+            std::process::exit(1);
         }
     }
 }
 
-async fn run_user_lib_migrations() {
-    let db_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+async fn run_user_lib_migrations() -> Result<(), String> {
+    let db_url = std::env::var("DATABASE_URL")
+        .map_err(|_| "DATABASE_URL must be set".to_string())?;
+
     let pool = MySqlPool::connect(&db_url)
         .await
-        .expect("Failed to connect to database");
-
-    let migrator_path = Path::new("./libs/user-lib/migrations");
-    let migrator = Arc::new(Migrator::new(migrator_path).await.expect("Invalid migrator"));
+        .map_err(|e| format!("Failed to connect to database: {e}"))?;
 
     println!("Running migrations for user-lib...");
-    if let Err(e) = migrator.run(&pool).await {
-        eprintln!("Migration failed: {}", e);
-        process::exit(1);
-    }
+    USER_LIB_MIGRATOR
+        .run(&pool)
+        .await
+        .map_err(|e| format!("Migration failed: {e}"))?;
+
     println!("Migrations applied successfully.");
+    Ok(())
 }

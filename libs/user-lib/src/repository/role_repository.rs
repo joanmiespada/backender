@@ -1,5 +1,7 @@
-use sqlx::{query, query_as, MySqlPool, Error};
+use sqlx::{query, query_as, MySqlPool};
 use uuid::Uuid;
+
+use crate::repository::errors::{map_sqlx_error, UserRepositoryError};
 use crate::repository::models::RoleRow;
 
 #[derive(Debug, Clone)]
@@ -12,7 +14,7 @@ impl RoleRepository {
         Self { pool }
     }
 
-    pub async fn create_role(&self, name: &str) -> Result<RoleRow, Error> {
+    pub async fn create_role(&self, name: &str) -> Result<RoleRow, UserRepositoryError> {
         let id = Uuid::new_v4();
         query(
             r#"
@@ -23,18 +25,20 @@ impl RoleRepository {
         .bind(id.to_string())
         .bind(name)
         .execute(&self.pool)
-        .await?;
+        .await
+        .map_err(map_sqlx_error)?;
 
         let role = query_as::<_, RoleRow>(
             r#"SELECT id, name FROM roles WHERE id = ? "#
         )
         .bind(id.to_string())
         .fetch_one(&self.pool)
-        .await?;
+        .await
+        .map_err(map_sqlx_error)?;
         Ok(role)
     }
 
-    pub async fn get_role(&self, role_id: Uuid) -> Result<Option<RoleRow>, Error> {
+    pub async fn get_role(&self, role_id: Uuid) -> Result<Option<RoleRow>, UserRepositoryError> {
         let role = query_as::<_, RoleRow>(
             r#"
             SELECT id, name FROM roles WHERE id = ?
@@ -42,11 +46,12 @@ impl RoleRepository {
         )
         .bind(role_id)
         .fetch_optional(&self.pool)
-        .await?;
+        .await
+        .map_err(map_sqlx_error)?;
         Ok(role)
     }
 
-    pub async fn update_role(&self, role_id: Uuid, name: &str) -> Result<RoleRow, Error> {
+    pub async fn update_role(&self, role_id: Uuid, name: &str) -> Result<RoleRow, UserRepositoryError> {
         query(
             r#"
             UPDATE roles
@@ -57,18 +62,20 @@ impl RoleRepository {
         .bind(name)
         .bind(role_id)
         .execute(&self.pool)
-        .await?;
+        .await
+        .map_err(map_sqlx_error)?;
 
         let role = query_as::<_, RoleRow>(
             r#"SELECT id, name FROM roles WHERE id = ? "#
         )
         .bind(role_id)
         .fetch_one(&self.pool)
-        .await?;
+        .await
+        .map_err(map_sqlx_error)?;
         Ok(role)
     }
 
-    pub async fn delete_role(&self, role_id: Uuid) -> Result<(), Error> {
+    pub async fn delete_role(&self, role_id: Uuid) -> Result<(), UserRepositoryError> {
         sqlx::query(
             r#"
             DELETE FROM roles WHERE id = ?
@@ -76,11 +83,12 @@ impl RoleRepository {
         )
         .bind(role_id)
         .execute(&self.pool)
-        .await?;
+        .await
+        .map_err(map_sqlx_error)?;
         Ok(())
     }
 
-    pub async fn get_roles_for_user(&self, user_id: Uuid) -> Result<Vec<RoleRow>, Error> {
+    pub async fn get_roles_for_user(&self, user_id: Uuid) -> Result<Vec<RoleRow>, UserRepositoryError> {
         let roles = query_as::<_, RoleRow>(
             r#"
             SELECT r.id, r.name
@@ -91,18 +99,20 @@ impl RoleRepository {
         )
         .bind(user_id)
         .fetch_all(&self.pool)
-        .await?;
+        .await
+        .map_err(map_sqlx_error)?;
         Ok(roles)
     }
 
-    pub async fn get_roles(&self) -> Result<Vec<RoleRow>, Error> {
+    pub async fn get_roles(&self) -> Result<Vec<RoleRow>, UserRepositoryError> {
         let roles = query_as::<_, RoleRow>(
             r#"
             SELECT id, name FROM roles
             "#
         )
         .fetch_all(&self.pool)
-        .await?;
+        .await
+        .map_err(map_sqlx_error)?;
         Ok(roles)
     }
 }
