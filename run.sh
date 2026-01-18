@@ -62,4 +62,5 @@ echo "Running database migrations (backcli)..."
 cargo run --bin backcli -- --migrations --user-lib
 
 # Run the Rust API locally (talking to MySQL via the published port)
-cargo run --bin user-api
+#cargo run --bin user-api
+cargo watch -x "run --bin user-api" 

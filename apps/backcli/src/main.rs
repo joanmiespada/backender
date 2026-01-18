@@ -4,7 +4,7 @@ use clap::{Arg, ArgAction, Command};
 use sqlx::MySqlPool;
 
 // NOTE: sqlx::migrate!(...) paths are resolved relative to this crate's directory (apps/backcli)
-static USER_LIB_MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("../../libs/user-lib/migrations");
+static USER_LIB_MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!  ("../../libs/user-lib/migrations");
 
 #[tokio::main]
 async fn main() {
@@ -15,6 +15,12 @@ async fn main() {
                 .long("migrations")
                 .action(ArgAction::SetTrue)
                 .help("Execute database migrations"),
+        )
+        .arg(
+            Arg::new("delete")
+                .long("delete")
+                .action(ArgAction::SetTrue)
+                .help("Revert migrations (down) for the selected library"),
         )
         .arg(
             Arg::new("user-lib")
@@ -37,6 +43,19 @@ async fn main() {
             std::process::exit(1);
         }
     }
+
+    if matches.get_flag("delete"){
+        let result = if matches.get_flag("user-lib") {
+            run_user_lib_delete().await
+        } else {
+            // In the future, support more libs here
+            run_user_lib_delete().await
+        };
+        if let Err(e) = result {
+            eprintln!("{e}");
+            std::process::exit(1);
+        }
+    }
 }
 
 async fn run_user_lib_migrations() -> Result<(), String> {
@@ -54,5 +73,25 @@ async fn run_user_lib_migrations() -> Result<(), String> {
         .map_err(|e| format!("Migration failed: {e}"))?;
 
     println!("Migrations applied successfully.");
+    Ok(())
+}
+
+async fn run_user_lib_delete() -> Result<(), String> {
+    let db_url = std::env::var("DATABASE_URL")
+        .map_err(|_| "DATABASE_URL must be set".to_string())?;
+
+    let pool = MySqlPool::connect(&db_url)
+        .await
+        .map_err(|e| format!("Failed to connect to database: {e}"))?;
+
+    println!("Reverting all migrations for user-lib...");
+    // SQLx Migrator supports down migrations via `undo(target_version)`.
+    // Passing `0` reverts all applied migrations because migration versions are positive timestamps.
+    USER_LIB_MIGRATOR
+        .undo(&pool, 0)
+        .await
+        .map_err(|e| format!("Revert failed: {e}"))?;
+
+    println!("Data deleted successfully.");
     Ok(())
 }

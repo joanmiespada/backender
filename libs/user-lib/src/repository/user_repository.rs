@@ -48,7 +48,7 @@ impl UserRepository {
             SELECT id, name, email FROM users WHERE id = ?
             "#
         )
-        .bind(user_id)
+        .bind(user_id.to_string())
         .fetch_optional(&self.pool)
         .await
         .map_err(UserRepositoryError::from)?;
@@ -66,7 +66,7 @@ impl UserRepository {
         )
         .bind(name)
         .bind(email)
-        .bind(user_id)
+        .bind(user_id.to_string())
         .execute(&self.pool)
         .await
         .map_err(UserRepositoryError::from)?;
@@ -76,7 +76,7 @@ impl UserRepository {
             SELECT id, name, email FROM users WHERE id = ?
             "#
         )
-        .bind(user_id)
+        .bind(user_id.to_string())
         .fetch_one(&self.pool)
         .await
         .map_err(UserRepositoryError::from)?;
@@ -90,7 +90,7 @@ impl UserRepository {
             DELETE FROM users WHERE id = ?
             "#
         )
-        .bind(user_id)
+        .bind(user_id.to_string())
         .execute(&self.pool)
         .await
         .map_err(UserRepositoryError::from)?;
@@ -119,7 +119,7 @@ impl UserRepository {
             WHERE ur.role_id = ?
             "#
         )
-        .bind(role_id)
+        .bind(role_id.to_string())
         .fetch_all(&self.pool)
         .await
         .map_err(UserRepositoryError::from)?;

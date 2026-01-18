@@ -38,33 +38,53 @@ impl From<sqlx::Error> for UserRepositoryError {
     }
 }
 
+
+fn extract_mysql_key_name(msg_lower: &str) -> Option<String> {
+    // msg_lower is already lowercased
+    let marker = "for key '";
+    let start = msg_lower.find(marker)? + marker.len();
+    let rest = &msg_lower[start..];
+    let end = rest.find('\'')?;
+    Some(rest[..end].to_string())
+}
+
 pub fn map_sqlx_error(err: sqlx::Error) -> UserRepositoryError {
+
+    const USER_EMAIL_UNIQUE: &str = "user_email_unique";
+    const ROLE_NAME_UNIQUE: &str = "role_name_unique";
+    const USER_ROLES_PK: &str = "user_roles_pk";
+
     if let sqlx::Error::Database(db_err) = &err {
-        let code_is_duplicate = db_err.code().as_deref() == Some("1062");
-        if code_is_duplicate {
-            // MySQL typically reports the violated index/constraint name as the "key".
-            // For unnamed UNIQUE constraints, the key often matches the column name.
-            let msg = db_err.message().to_lowercase();
-            let constraint = db_err
-                .constraint()
-                .map(|c| c.to_lowercase())
-                .unwrap_or_default();
+        // MySQL duplicate key violations typically surface as:
+        // - SQLSTATE code: 23000 (integrity constraint violation)
+        // - message: "Duplicate entry '...' for key '...'"
+        //tracing::info!("Database error: {:?}", db_err);
 
-            // Helper: does the message mention a given key name?
-            let mentions_key = |k: &str| msg.contains("for key") && msg.contains(k);
+        let msg = db_err.message().to_lowercase();
+        let is_duplicate_key = db_err.code().as_deref() == Some("23000")
+            && msg.contains("duplicate entry")
+            && msg.contains("for key");
 
-            // users.email has UNIQUE, so key is commonly `email`
-            if constraint == "email" || mentions_key("'email'") || mentions_key("`email`") {
+        if is_duplicate_key {
+            // Example message:
+            // "Duplicate entry 'user12@user.com' for key 'users.user_email_unique'"
+            // We extract the key name between "for key '" and the next "'".
+            let key = extract_mysql_key_name(&msg).unwrap_or_default();
+
+            //tracing::info!("Duplicate key: {}", key);
+            //tracing::info!("Error Message: {}", msg);
+
+            // Prefer deterministic matching on named constraints.
+            // MySQL may prefix with table name (e.g., "users.user_email_unique"), so we use `ends_with`.
+            if key.ends_with(USER_EMAIL_UNIQUE) || msg.contains(USER_EMAIL_UNIQUE) {
                 return UserRepositoryError::EmailAlreadyExists;
             }
 
-            // roles.name has UNIQUE, so key is commonly `name`
-            if constraint == "name" || mentions_key("'name'") || mentions_key("`name`") {
+            if key.ends_with(ROLE_NAME_UNIQUE) || msg.contains(ROLE_NAME_UNIQUE) {
                 return UserRepositoryError::RoleNameAlreadyExists;
             }
 
-            // user_roles has PRIMARY KEY(user_id, role_id). Duplicate assignment => key PRIMARY
-            if constraint == "primary" || mentions_key("'primary'") || mentions_key("`primary`") {
+            if key.ends_with(USER_ROLES_PK) || msg.contains(USER_ROLES_PK) {
                 return UserRepositoryError::UserAlreadyHasRole;
             }
         }
