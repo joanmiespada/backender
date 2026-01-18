@@ -1,9 +1,12 @@
 # -------- Builder --------
-FROM rust:1.75-alpine AS builder
+FROM rust:1.92-alpine AS builder
 
 RUN apk add --no-cache \
     musl-dev \
-    build-base
+    build-base \
+    pkgconf \
+    openssl-dev \
+    curl
 
 WORKDIR /workspace
 
@@ -14,10 +17,15 @@ COPY apps/backcli/Cargo.toml apps/backcli/Cargo.toml
 COPY libs/user-lib/Cargo.toml libs/user-lib/Cargo.toml
 
 # Dummy build to cache deps
+# Cargo loads workspace members during dependency resolution; each member must have at least one target file.
 RUN mkdir -p apps/user-api/src \
- && echo "fn main() {}" > apps/user-api/src/main.rs
+ && echo "fn main() {}" > apps/user-api/src/main.rs \
+ && mkdir -p apps/backcli/src \
+ && echo "fn main() {}" > apps/backcli/src/main.rs \
+ && mkdir -p libs/user-lib/src \
+ && echo "pub fn _dummy() {}" > libs/user-lib/src/lib.rs
 RUN cargo build -p user-api --release
-RUN rm -rf apps/user-api/src
+RUN rm -rf apps/user-api/src apps/backcli/src libs/user-lib/src
 
 # Copy real sources
 COPY apps ./apps
@@ -38,5 +46,5 @@ COPY --from=builder /workspace/target/release/user-api /app/user-api
 RUN addgroup -S app && adduser -S app -G app
 USER app
 
-EXPOSE 8080
+EXPOSE 3333
 CMD ["./user-api"]

@@ -1,0 +1,21 @@
+filebeat.autodiscover:
+  providers:
+    - type: docker
+      hints.enabled: true
+
+processors:
+  - add_docker_metadata: {}
+
+output.elasticsearch:
+  hosts: ["${ELASTICSEARCH_HOSTS}"]
+
+# Local: make a predictable index name (simple)
+setup.template.enabled: true
+setup.ilm.enabled: false
+
+# Default index for logs (can be overridden per-container via label)
+output.elasticsearch.index: "logs-generic-%{+yyyy.MM.dd}"
+
+# Kibana dashboards setup (optional; safe to keep)
+setup.kibana:
+  host: "http://kibana:5601"

@@ -125,6 +125,26 @@ services:
     depends_on:
       elasticsearch:
         condition: service_healthy
+  
+  ## 📦 Filebeat (ship Docker logs -> Elasticsearch)
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.11.1
+    user: root
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    volumes:
+      # Filebeat config
+      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+
+      # Read Docker container logs (Docker Desktop will expose this to containers)
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+
+      # Enrich events with Docker metadata (container name, labels, image, etc.)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    command: ["--strict.perms=false"]
 
   ## 📈 Prometheus
   prometheus:
@@ -163,6 +183,32 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.traefik.rule=Host(`traefik.localhost`)"
       - "traefik.http.routers.traefik.service=api@internal"
+
+  ## 🧩 user-api (built from repo Dockerfile)
+  user-api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: backender/user-api:local
+    env_file:
+      - ../.env.local
+    environment:
+      - ENV=local
+      - USER_API_PORT=${USER_API_PORT:-3333}
+    ports:
+      - "${USER_API_PORT:-3333}:${USER_API_PORT:-3333}"
+    depends_on:
+      - mysql
+      - redis
+      - elasticsearch
+    labels:
+      # Enable Filebeat autodiscover hints for this container
+      co.elastic.logs/enabled: "true"
+      # user-api emits JSON logs to stdout; parse them
+      co.elastic.logs/json.keys_under_root: "true"
+      co.elastic.logs/json.add_error_key: "true"
+      # Store in a dedicated index per day
+      co.elastic.logs/index: "logs-user-api-%{+yyyy.MM.dd}"
 
 volumes:
   redis-data:

@@ -1,36 +1,37 @@
-#[derive(Clone, Debug)]
-struct AppState {
-    user_service: Arc<UserService>,
-    env: String,
-}
 
-impl AppState {
-    fn is_prod_like(&self) -> bool {
-        // Treat any environment starting with "prod" as production-like (prod01, prod02, ...)
-        self.env.to_lowercase().starts_with("prod")
-    }
-}
+mod state;
+mod constants;
+mod methods;
+
 use axum::{
     routing::{get, post},
-    Json, Router,
+    Router,
 };
-use serde::{Deserialize, Serialize};
 use tokio;
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use tracing_subscriber::EnvFilter;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 use user_lib::{user_service::UserService, util::connect_with_retry};
 use user_lib::repository::role_repository::RoleRepository;
 use user_lib::repository::user_repository::UserRepository;
 use user_lib::repository::user_role_repository::UserRoleRepository;
-use user_lib::entities::User;
-use user_lib::errors_service::UserServiceError;
-use uuid::Uuid;
-use utoipa::ToSchema;
 use tokio::net::TcpListener;
-
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 use std::sync::Arc;
+
+use crate::{constants::{LOCAL_ENV,USER_API_PORT, SERVICE}};
+use crate::methods::health_check::health_check;
+use crate::methods::create_user::create_user;
+use crate::methods::create_user::__path_create_user;
+use crate::methods::get_user_by_id::get_user_by_id;
+use crate::methods::get_user_by_id::__path_get_user_by_id;
+use crate::methods::entities::{CreateUserRequest, UserResponse};
+use crate::state::AppState;
+use crate::methods::routes::{USERS_PATH, USERS_BY_ID_PATH, SERVICE_HEALTH_PATH, SERVICE_DOCS_PATH};
+use crate::constants::{ENV, ELASTIC_URL, DATABASE_URL};
+
 
 #[derive(OpenApi)]
 #[openapi(
@@ -46,23 +47,37 @@ struct ApiDoc;
 #[tokio::main]
 async fn main() {
     // Setup tracing subscriber
-    // Use RUST_LOG if set, otherwise default to INFO for app + DEBUG for HTTP tracing.
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info"));
+    // - Always: JSON logs to STDOUT (so they can be shipped to Elasticsearch)
+    // - Additionally on local: pretty logs to STDERR (no duplicates in STDOUT)
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
-    let subscriber = tracing_subscriber::fmt()
-        .with_env_filter(filter)
-        //.with_max_level(Level::DEBUG)
-        .finish();
+    let env = std::env::var(ENV).expect( format!("{} must be set", ENV).as_str());
 
-    tracing::subscriber::set_global_default(subscriber)
-        .expect("setting default subscriber failed");
+    // We don't send logs directly to Elasticsearch from the app.
+    // In shared envs, a shipper (Elastic Agent / Filebeat / Fluent Bit) forwards STDOUT to Elasticsearch.
+    let _elastic_url = std::env::var(ELASTIC_URL).ok();
 
-    //Global environment variable
-    let env = std::env::var("ENV").expect("ENV must be set");
+    let registry = tracing_subscriber::registry().with(filter);
+
+    let json_layer = tracing_subscriber::fmt::layer()
+        .json()
+        .with_current_span(true)
+        .with_span_list(true);
+
+    if env == LOCAL_ENV {
+        let pretty_layer = tracing_subscriber::fmt::layer()
+            .with_writer(std::io::stderr)
+            .pretty();
+        registry.with(json_layer).with(pretty_layer).init();
+        //registry.with(pretty_layer).init();
+    } else {
+        registry.with(json_layer).init();
+    }
+
+    tracing::info!(service=SERVICE, env = %env, "tracing initialized");
 
     // Setup database pool
-    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let database_url = std::env::var(DATABASE_URL).expect( format!("{} must be set", DATABASE_URL).as_str());
 
     let pool = connect_with_retry(&database_url, 10).await;
     // Create shared service
@@ -74,10 +89,10 @@ async fn main() {
 
     // Build application with routes
     let app = Router::new()
-        .route("/health", get(health_check))
-        .route("/users", post(create_user))
-        .route("/users/{id}", get(get_user_by_id))
-        .merge(SwaggerUi::new("/docs").url("/api-doc/openapi.json", ApiDoc::openapi()))
+        .route(SERVICE_HEALTH_PATH, get(health_check))
+        .route(USERS_PATH, post(create_user))
+        .route(USERS_BY_ID_PATH, get(get_user_by_id))
+        .merge(SwaggerUi::new(SERVICE_DOCS_PATH).url("/api-doc/openapi.json", ApiDoc::openapi()))
         .with_state(AppState { user_service: Arc::new(user_service), env: env.clone() })
         // Log one line per request/response at DEBUG (method, path, status, latency)
         .layer(
@@ -87,7 +102,7 @@ async fn main() {
         );
 
     // Read port from env (default to 3333)
-    let port: u16 = std::env::var("USER_API_PORT")
+    let port: u16 = std::env::var(USER_API_PORT)
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(3333);
@@ -106,110 +121,6 @@ async fn main() {
     
 }
 
-async fn health_check() -> &'static str {
-    "OK"
-}
-
-#[derive(Debug, Deserialize, Serialize, ToSchema)]
-struct CreateUserRequest {
-    name: String,
-    email: String,
-}
-
-#[derive(Debug, Serialize, ToSchema)]
-pub struct UserResponse {
-    pub id: Uuid,
-    pub name: String,
-    pub email: String,
-}
-
-impl From<User> for UserResponse {
-    fn from(user: User) -> Self {
-        UserResponse {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-        }
-    }
-}
 
 
-#[utoipa::path(
-    post,
-    path = "/users",
-    request_body = CreateUserRequest,
-    responses(
-        (status = 200, description = "User created successfully", body = UserResponse),
-        (status = 409, description = "Email already exists"),
-        (status = 500, description = "Internal server error"),
-    )
-)]
 
-async fn create_user(
-    axum::extract::State(state): axum::extract::State<AppState>,
-    Json(payload): Json<CreateUserRequest>,
-) -> Result<Json<UserResponse>, (axum::http::StatusCode, String)> {
-    let user_service = state.user_service.clone();
-    let env = state.env.clone();
-    let prod_like = state.is_prod_like();
-    user_service
-        .create_user(&payload.name, &payload.email)
-        .await
-        .map(|user| Json(UserResponse::from(user)))
-        .map_err(|e| {
-            match e {
-                UserServiceError::EmailAlreadyExists => {
-                    (axum::http::StatusCode::CONFLICT, UserServiceError::EmailAlreadyExists.to_string())
-                }
-                UserServiceError::RoleNameAlreadyExists => (axum::http::StatusCode::CONFLICT, e.to_string()),
-                UserServiceError::UserAlreadyHasRole => (axum::http::StatusCode::CONFLICT, e.to_string()),
-                other => {
-                    tracing::error!(env = %env, error = ?other, "create_user failed");
-                    if prod_like {
-                        (axum::http::StatusCode::INTERNAL_SERVER_ERROR, "internal server error".to_string())
-                    } else {
-                        (axum::http::StatusCode::INTERNAL_SERVER_ERROR, other.to_string())
-                    }
-                }
-            }
-        })
-}
-
-#[utoipa::path(
-    get,
-    path = "/users/{id}",
-    params(
-        ("id" = String, Path, description = "User ID (UUID)")
-    ),
-    responses(
-        (status = 200, description = "User found", body = UserResponse),
-        (status = 404, description = "User not found"),
-        (status = 400, description = "Invalid UUID"),
-        (status = 500, description = "Internal server error"),
-    )
-)]
-async fn get_user_by_id(
-    axum::extract::Path(id): axum::extract::Path<String>,
-    axum::extract::State(state): axum::extract::State<AppState>,
-) -> Result<Json<UserResponse>, (axum::http::StatusCode, String)> {
-    let user_service = state.user_service.clone();
-    let env = state.env.clone();
-    let prod_like = state.is_prod_like();
-    match Uuid::parse_str(&id) {
-        Ok(parsed_id) => {
-            match user_service.get_user(parsed_id).await {
-                Ok(Some(user)) => Ok(Json(UserResponse::from(user))),
-                Ok(None) => Err((axum::http::StatusCode::NOT_FOUND, "user not found".to_string())),
-                Err(e) => {
-                    tracing::error!(env = %env, error = ?e, "get_user failed");
-                    if prod_like {
-                        Err((axum::http::StatusCode::INTERNAL_SERVER_ERROR, "internal server error".to_string()))
-                    } else {
-                        Err((axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
-                    }
-                }
-            }
-        }
-        Err(_) => Err((axum::http::StatusCode::BAD_REQUEST, "invalid uuid".to_string())),
-    }
-}
