@@ -10,6 +10,7 @@ use crate::methods::routes::USERS_PATH;
     request_body = CreateUserRequest,
     responses(
         (status = 200, description = "User created successfully", body = UserResponse),
+        (status = 400, description = "Validation error"),
         (status = 409, description = "Email already exists"),
         (status = 500, description = "Internal server error"),
     )
@@ -28,6 +29,9 @@ pub async fn create_user(
         .map(|user| Json(UserResponse::from(user)))
         .map_err(|e| {
             match e {
+                UserServiceError::Validation(msg) => {
+                    (axum::http::StatusCode::BAD_REQUEST, msg)
+                }
                 UserServiceError::EmailAlreadyExists => {
                     (axum::http::StatusCode::CONFLICT, UserServiceError::EmailAlreadyExists.to_string())
                 }

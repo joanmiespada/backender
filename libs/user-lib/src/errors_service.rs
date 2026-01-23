@@ -15,6 +15,12 @@ pub enum UserServiceError {
     #[error("resource not found")]
     NotFound,
 
+    #[error("invalid UUID in database: {0}")]
+    InvalidUuid(String),
+
+    #[error("validation error: {0}")]
+    Validation(String),
+
     #[error(transparent)]
     Internal(#[from] anyhow::Error),
 }

@@ -1,6 +1,7 @@
 use async_trait::async_trait;
-use sqlx::{query, query_as, MySqlPool};
+use sqlx::{query, query_as, query_scalar, MySqlPool};
 use uuid::Uuid;
+use crate::entities::PaginationParams;
 use crate::repository::models::UserRow;
 use crate::repository::errors::UserRepositoryError;
 use crate::repository::traits::UserRepositoryTrait;
@@ -103,32 +104,59 @@ impl UserRepositoryTrait for UserRepository {
         Ok(())
     }
 
-    async fn get_users(&self) -> Result<Vec<UserRow>, UserRepositoryError> {
+    async fn get_users_paginated(&self, pagination: PaginationParams) -> Result<(Vec<UserRow>, u64), UserRepositoryError> {
+        let total: i64 = query_scalar("SELECT COUNT(*) FROM users")
+            .fetch_one(&self.pool)
+            .await
+            .map_err(UserRepositoryError::from)?;
+
         let users = query_as::<_, UserRow>(
             r#"
             SELECT id, name, email FROM users
+            ORDER BY name
+            LIMIT ? OFFSET ?
             "#
         )
+        .bind(pagination.limit())
+        .bind(pagination.offset())
         .fetch_all(&self.pool)
         .await
         .map_err(UserRepositoryError::from)?;
 
-        Ok(users)
+        Ok((users, total as u64))
     }
-    async fn get_users_by_role(&self, role_id: Uuid) -> Result<Vec<UserRow>, UserRepositoryError> {
-        let users = query_as::<_, UserRow>(
+
+    async fn get_users_by_role_paginated(&self, role_id: Uuid, pagination: PaginationParams) -> Result<(Vec<UserRow>, u64), UserRepositoryError> {
+        let total: i64 = query_scalar(
             r#"
-            SELECT u.id, u.name, u.email
+            SELECT COUNT(*)
             FROM users u
             JOIN user_roles ur ON u.id = ur.user_id
             WHERE ur.role_id = ?
             "#
         )
         .bind(role_id.to_string())
+        .fetch_one(&self.pool)
+        .await
+        .map_err(UserRepositoryError::from)?;
+
+        let users = query_as::<_, UserRow>(
+            r#"
+            SELECT u.id, u.name, u.email
+            FROM users u
+            JOIN user_roles ur ON u.id = ur.user_id
+            WHERE ur.role_id = ?
+            ORDER BY u.name
+            LIMIT ? OFFSET ?
+            "#
+        )
+        .bind(role_id.to_string())
+        .bind(pagination.limit())
+        .bind(pagination.offset())
         .fetch_all(&self.pool)
         .await
         .map_err(UserRepositoryError::from)?;
 
-        Ok(users)
+        Ok((users, total as u64))
     }
 }

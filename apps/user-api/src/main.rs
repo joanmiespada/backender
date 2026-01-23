@@ -4,7 +4,7 @@ mod constants;
 mod methods;
 
 use axum::{
-    routing::{get, post},
+    routing::get,
     Router,
 };
 use tokio;
@@ -27,7 +27,9 @@ use crate::methods::create_user::create_user;
 use crate::methods::create_user::__path_create_user;
 use crate::methods::get_user_by_id::get_user_by_id;
 use crate::methods::get_user_by_id::__path_get_user_by_id;
-use crate::methods::entities::{CreateUserRequest, UserResponse};
+use crate::methods::get_users::get_users;
+use crate::methods::get_users::__path_get_users;
+use crate::methods::entities::{CreateUserRequest, UserResponse, PaginatedResponse};
 use crate::state::AppState;
 use crate::methods::routes::{USERS_PATH, USERS_BY_ID_PATH, SERVICE_HEALTH_PATH, SERVICE_DOCS_PATH};
 use crate::constants::{ENV, ELASTIC_URL, DATABASE_URL};
@@ -35,8 +37,8 @@ use crate::constants::{ENV, ELASTIC_URL, DATABASE_URL};
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(create_user, get_user_by_id),
-    components(schemas(CreateUserRequest, UserResponse)),
+    paths(create_user, get_user_by_id, get_users),
+    components(schemas(CreateUserRequest, UserResponse, PaginatedResponse<UserResponse>)),
     tags(
         (name = "users", description = "User management endpoints")
     )
@@ -90,7 +92,7 @@ async fn main() {
     // Build application with routes
     let app = Router::new()
         .route(SERVICE_HEALTH_PATH, get(health_check))
-        .route(USERS_PATH, post(create_user))
+        .route(USERS_PATH, get(get_users).post(create_user))
         .route(USERS_BY_ID_PATH, get(get_user_by_id))
         .merge(SwaggerUi::new(SERVICE_DOCS_PATH).url("/api-doc/openapi.json", ApiDoc::openapi()))
         .with_state(AppState { user_service: Arc::new(user_service), env: env.clone() })

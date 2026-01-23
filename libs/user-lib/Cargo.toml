@@ -25,6 +25,12 @@ sqlx = { version = "0.8.6", features = ["mysql", "runtime-tokio-native-tls", "ma
 uuid = "1"
 mockall = "0.13"
 async-trait = "0.1"
+cucumber = "0.21"
+futures = "0.3"
+
+[[test]]
+name = "bdd"
+harness = false
 
 [build-dependencies]
 dotenvy = "0.15"

@@ -3,8 +3,9 @@ use async_trait::async_trait;
 use mockall::mock;
 use uuid::Uuid;
 
+use user_lib::entities::PaginationParams;
 use user_lib::repository::errors::UserRepositoryError;
-use user_lib::repository::models::{RoleRow, UserRow};
+use user_lib::repository::models::{RoleRow, UserRow, UserRoleMapping};
 use user_lib::repository::traits::{RoleRepositoryTrait, UserRepositoryTrait, UserRoleRepositoryTrait};
 use user_lib::errors_service::UserServiceError;
 use user_lib::user_service::UserService;
@@ -18,8 +19,8 @@ mock! {
         async fn get_user(&self, user_id: Uuid) -> Result<Option<UserRow>, UserRepositoryError>;
         async fn update_user(&self, user_id: Uuid, name: &str, email: &str) -> Result<UserRow, UserRepositoryError>;
         async fn delete_user(&self, user_id: Uuid) -> Result<(), UserRepositoryError>;
-        async fn get_users(&self) -> Result<Vec<UserRow>, UserRepositoryError>;
-        async fn get_users_by_role(&self, role_id: Uuid) -> Result<Vec<UserRow>, UserRepositoryError>;
+        async fn get_users_paginated(&self, pagination: PaginationParams) -> Result<(Vec<UserRow>, u64), UserRepositoryError>;
+        async fn get_users_by_role_paginated(&self, role_id: Uuid, pagination: PaginationParams) -> Result<(Vec<UserRow>, u64), UserRepositoryError>;
     }
 }
 
@@ -33,7 +34,8 @@ mock! {
         async fn update_role(&self, role_id: Uuid, name: &str) -> Result<RoleRow, UserRepositoryError>;
         async fn delete_role(&self, role_id: Uuid) -> Result<(), UserRepositoryError>;
         async fn get_roles_for_user(&self, user_id: Uuid) -> Result<Vec<RoleRow>, UserRepositoryError>;
-        async fn get_roles(&self) -> Result<Vec<RoleRow>, UserRepositoryError>;
+        async fn get_roles_for_users(&self, user_ids: &[String]) -> Result<Vec<UserRoleMapping>, UserRepositoryError>;
+        async fn get_roles_paginated(&self, pagination: PaginationParams) -> Result<(Vec<RoleRow>, u64), UserRepositoryError>;
     }
 }
 
@@ -481,12 +483,14 @@ async fn test_get_users_success() {
 
     let user1_id = Uuid::new_v4();
     let user2_id = Uuid::new_v4();
+    let role_id = Uuid::new_v4();
 
+    let user1_id_clone = user1_id;
     user_repo
-        .expect_get_users()
+        .expect_get_users_paginated()
         .times(1)
-        .returning(move || {
-            Ok(vec![
+        .returning(move |_| {
+            Ok((vec![
                 UserRow {
                     id: user1_id.to_string(),
                     name: "User One".to_string(),
@@ -497,22 +501,33 @@ async fn test_get_users_success() {
                     name: "User Two".to_string(),
                     email: "user2@example.com".to_string(),
                 },
-            ])
+            ], 2))
         });
 
     role_repo
-        .expect_get_roles_for_user()
-        .times(2)
-        .returning(|_| Ok(vec![]));
+        .expect_get_roles_for_users()
+        .times(1)
+        .returning(move |_| {
+            Ok(vec![UserRoleMapping {
+                user_id: user1_id_clone.to_string(),
+                role_id: role_id.to_string(),
+                role_name: "admin".to_string(),
+            }])
+        });
 
     let service = create_test_service(user_repo, role_repo, user_role_repo);
-    let result = service.get_users().await;
+    let result = service.get_users(PaginationParams::default()).await;
 
     assert!(result.is_ok());
-    let users = result.unwrap();
-    assert_eq!(users.len(), 2);
-    assert_eq!(users[0].name, "User One");
-    assert_eq!(users[1].name, "User Two");
+    let paginated = result.unwrap();
+    assert_eq!(paginated.items.len(), 2);
+    assert_eq!(paginated.total, 2);
+    assert_eq!(paginated.page, 1);
+    assert_eq!(paginated.items[0].name, "User One");
+    assert_eq!(paginated.items[0].roles.len(), 1);
+    assert_eq!(paginated.items[0].roles[0].name, "admin");
+    assert_eq!(paginated.items[1].name, "User Two");
+    assert_eq!(paginated.items[1].roles.len(), 0);
 }
 
 #[tokio::test]
@@ -522,15 +537,17 @@ async fn test_get_users_empty() {
     let user_role_repo = MockUserRoleRepo::new();
 
     user_repo
-        .expect_get_users()
+        .expect_get_users_paginated()
         .times(1)
-        .returning(|| Ok(vec![]));
+        .returning(|_| Ok((vec![], 0)));
 
     let service = create_test_service(user_repo, role_repo, user_role_repo);
-    let result = service.get_users().await;
+    let result = service.get_users(PaginationParams::default()).await;
 
     assert!(result.is_ok());
-    assert!(result.unwrap().is_empty());
+    let paginated = result.unwrap();
+    assert!(paginated.items.is_empty());
+    assert_eq!(paginated.total, 0);
 }
 
 // ==================== GET ROLES TESTS ====================
@@ -545,10 +562,10 @@ async fn test_get_roles_success() {
     let role2_id = Uuid::new_v4();
 
     role_repo
-        .expect_get_roles()
+        .expect_get_roles_paginated()
         .times(1)
-        .returning(move || {
-            Ok(vec![
+        .returning(move |_| {
+            Ok((vec![
                 RoleRow {
                     id: role1_id.to_string(),
                     name: "admin".to_string(),
@@ -557,17 +574,18 @@ async fn test_get_roles_success() {
                     id: role2_id.to_string(),
                     name: "user".to_string(),
                 },
-            ])
+            ], 2))
         });
 
     let service = create_test_service(user_repo, role_repo, user_role_repo);
-    let result = service.get_roles().await;
+    let result = service.get_roles(PaginationParams::default()).await;
 
     assert!(result.is_ok());
-    let roles = result.unwrap();
-    assert_eq!(roles.len(), 2);
-    assert_eq!(roles[0].name, "admin");
-    assert_eq!(roles[1].name, "user");
+    let paginated = result.unwrap();
+    assert_eq!(paginated.items.len(), 2);
+    assert_eq!(paginated.total, 2);
+    assert_eq!(paginated.items[0].name, "admin");
+    assert_eq!(paginated.items[1].name, "user");
 }
 
 // ==================== GET ROLES FOR USER TESTS ====================
@@ -613,33 +631,170 @@ async fn test_get_users_by_role_success() {
     let user_id = Uuid::new_v4();
 
     user_repo
-        .expect_get_users_by_role()
-        .withf(move |id| *id == role_id)
+        .expect_get_users_by_role_paginated()
+        .withf(move |id, _| *id == role_id)
         .times(1)
-        .returning(move |_| {
-            Ok(vec![UserRow {
+        .returning(move |_, _| {
+            Ok((vec![UserRow {
                 id: user_id.to_string(),
                 name: "Admin User".to_string(),
                 email: "admin@example.com".to_string(),
-            }])
+            }], 1))
         });
 
     role_repo
-        .expect_get_roles_for_user()
+        .expect_get_roles_for_users()
         .times(1)
         .returning(move |_| {
-            Ok(vec![RoleRow {
-                id: role_id.to_string(),
-                name: "admin".to_string(),
+            Ok(vec![UserRoleMapping {
+                user_id: user_id.to_string(),
+                role_id: role_id.to_string(),
+                role_name: "admin".to_string(),
             }])
         });
 
     let service = create_test_service(user_repo, role_repo, user_role_repo);
-    let result = service.get_users_by_role(role_id).await;
+    let result = service.get_users_by_role(role_id, PaginationParams::default()).await;
 
     assert!(result.is_ok());
-    let users = result.unwrap();
-    assert_eq!(users.len(), 1);
-    assert_eq!(users[0].name, "Admin User");
-    assert_eq!(users[0].roles.len(), 1);
+    let paginated = result.unwrap();
+    assert_eq!(paginated.items.len(), 1);
+    assert_eq!(paginated.total, 1);
+    assert_eq!(paginated.items[0].name, "Admin User");
+    assert_eq!(paginated.items[0].roles.len(), 1);
+}
+
+// ==================== VALIDATION TESTS ====================
+
+#[tokio::test]
+async fn test_create_user_empty_name() {
+    let user_repo = MockUserRepo::new();
+    let role_repo = MockRoleRepo::new();
+    let user_role_repo = MockUserRoleRepo::new();
+
+    let service = create_test_service(user_repo, role_repo, user_role_repo);
+    let result = service.create_user("", "test@example.com").await;
+
+    assert!(result.is_err());
+    assert!(matches!(result.unwrap_err(), UserServiceError::Validation(_)));
+}
+
+#[tokio::test]
+async fn test_create_user_whitespace_name() {
+    let user_repo = MockUserRepo::new();
+    let role_repo = MockRoleRepo::new();
+    let user_role_repo = MockUserRoleRepo::new();
+
+    let service = create_test_service(user_repo, role_repo, user_role_repo);
+    let result = service.create_user("   ", "test@example.com").await;
+
+    assert!(result.is_err());
+    assert!(matches!(result.unwrap_err(), UserServiceError::Validation(_)));
+}
+
+#[tokio::test]
+async fn test_create_user_empty_email() {
+    let user_repo = MockUserRepo::new();
+    let role_repo = MockRoleRepo::new();
+    let user_role_repo = MockUserRoleRepo::new();
+
+    let service = create_test_service(user_repo, role_repo, user_role_repo);
+    let result = service.create_user("John Doe", "").await;
+
+    assert!(result.is_err());
+    assert!(matches!(result.unwrap_err(), UserServiceError::Validation(_)));
+}
+
+#[tokio::test]
+async fn test_create_user_invalid_email_no_at() {
+    let user_repo = MockUserRepo::new();
+    let role_repo = MockRoleRepo::new();
+    let user_role_repo = MockUserRoleRepo::new();
+
+    let service = create_test_service(user_repo, role_repo, user_role_repo);
+    let result = service.create_user("John Doe", "invalid-email").await;
+
+    assert!(result.is_err());
+    assert!(matches!(result.unwrap_err(), UserServiceError::Validation(_)));
+}
+
+#[tokio::test]
+async fn test_create_user_invalid_email_no_domain_dot() {
+    let user_repo = MockUserRepo::new();
+    let role_repo = MockRoleRepo::new();
+    let user_role_repo = MockUserRoleRepo::new();
+
+    let service = create_test_service(user_repo, role_repo, user_role_repo);
+    let result = service.create_user("John Doe", "test@localhost").await;
+
+    assert!(result.is_err());
+    assert!(matches!(result.unwrap_err(), UserServiceError::Validation(_)));
+}
+
+#[tokio::test]
+async fn test_create_user_invalid_email_multiple_at() {
+    let user_repo = MockUserRepo::new();
+    let role_repo = MockRoleRepo::new();
+    let user_role_repo = MockUserRoleRepo::new();
+
+    let service = create_test_service(user_repo, role_repo, user_role_repo);
+    let result = service.create_user("John Doe", "test@@example.com").await;
+
+    assert!(result.is_err());
+    assert!(matches!(result.unwrap_err(), UserServiceError::Validation(_)));
+}
+
+#[tokio::test]
+async fn test_create_user_name_too_long() {
+    let user_repo = MockUserRepo::new();
+    let role_repo = MockRoleRepo::new();
+    let user_role_repo = MockUserRoleRepo::new();
+
+    let long_name = "a".repeat(256);
+    let service = create_test_service(user_repo, role_repo, user_role_repo);
+    let result = service.create_user(&long_name, "test@example.com").await;
+
+    assert!(result.is_err());
+    assert!(matches!(result.unwrap_err(), UserServiceError::Validation(_)));
+}
+
+#[tokio::test]
+async fn test_create_role_empty_name() {
+    let user_repo = MockUserRepo::new();
+    let role_repo = MockRoleRepo::new();
+    let user_role_repo = MockUserRoleRepo::new();
+
+    let service = create_test_service(user_repo, role_repo, user_role_repo);
+    let result = service.create_role("").await;
+
+    assert!(result.is_err());
+    assert!(matches!(result.unwrap_err(), UserServiceError::Validation(_)));
+}
+
+#[tokio::test]
+async fn test_update_user_invalid_email() {
+    let user_repo = MockUserRepo::new();
+    let role_repo = MockRoleRepo::new();
+    let user_role_repo = MockUserRoleRepo::new();
+
+    let user_id = Uuid::new_v4();
+    let service = create_test_service(user_repo, role_repo, user_role_repo);
+    let result = service.update_user(user_id, "John", "not-an-email").await;
+
+    assert!(result.is_err());
+    assert!(matches!(result.unwrap_err(), UserServiceError::Validation(_)));
+}
+
+#[tokio::test]
+async fn test_update_role_empty_name() {
+    let user_repo = MockUserRepo::new();
+    let role_repo = MockRoleRepo::new();
+    let user_role_repo = MockUserRoleRepo::new();
+
+    let role_id = Uuid::new_v4();
+    let service = create_test_service(user_repo, role_repo, user_role_repo);
+    let result = service.update_role(role_id, "   ").await;
+
+    assert!(result.is_err());
+    assert!(matches!(result.unwrap_err(), UserServiceError::Validation(_)));
 }

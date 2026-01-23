@@ -2,6 +2,7 @@ use testcontainers::{
     core::{IntoContainerPort, WaitFor}, runners::AsyncRunner, GenericImage, ImageExt
 };
 use user_lib::{repository::{RoleRepository, UserRepository, UserRoleRepository}, user_service::UserService};
+use user_lib::entities::PaginationParams;
 use sqlx::migrate::Migrator;
 use user_lib::util::*;
 
@@ -50,8 +51,8 @@ async fn integration_user_service_flow() {
     user_service.assign_role(user1.id, role1.id).await.unwrap();
     user_service.assign_role(user2.id, role1.id).await.unwrap();
 
-    let list_users = user_service.get_users().await.unwrap();
-    assert_eq!(list_users.len(), 3);
+    let list_users = user_service.get_users(PaginationParams::default()).await.unwrap();
+    assert_eq!(list_users.items.len(), 3);
 
     // Delete user3
     user_service.delete_user(user3.id).await.unwrap();
