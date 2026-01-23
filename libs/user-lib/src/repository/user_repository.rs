@@ -1,7 +1,9 @@
+use async_trait::async_trait;
 use sqlx::{query, query_as, MySqlPool};
 use uuid::Uuid;
 use crate::repository::models::UserRow;
 use crate::repository::errors::UserRepositoryError;
+use crate::repository::traits::UserRepositoryTrait;
 
 #[derive(Debug, Clone)]
 pub struct UserRepository {
@@ -12,8 +14,11 @@ impl UserRepository {
     pub fn new(pool: MySqlPool) -> Self {
         Self { pool }
     }
+}
 
-    pub async fn create_user(&self, name: &str, email: &str) -> Result<UserRow, UserRepositoryError> {
+#[async_trait]
+impl UserRepositoryTrait for UserRepository {
+    async fn create_user(&self, name: &str, email: &str) -> Result<UserRow, UserRepositoryError> {
         let user_id = Uuid::new_v4();
 
         query(
@@ -42,7 +47,7 @@ impl UserRepository {
         Ok(user)
     }
 
-    pub async fn get_user(&self, user_id: Uuid) -> Result<Option<UserRow>, UserRepositoryError> {
+    async fn get_user(&self, user_id: Uuid) -> Result<Option<UserRow>, UserRepositoryError> {
         let user = query_as::<_, UserRow>(
             r#"
             SELECT id, name, email FROM users WHERE id = ?
@@ -56,7 +61,7 @@ impl UserRepository {
         Ok(user)
     }
 
-    pub async fn update_user(&self, user_id: Uuid, name: &str, email: &str) -> Result<UserRow, UserRepositoryError> {
+    async fn update_user(&self, user_id: Uuid, name: &str, email: &str) -> Result<UserRow, UserRepositoryError> {
         query(
             r#"
             UPDATE users
@@ -84,7 +89,7 @@ impl UserRepository {
         Ok(user)
     }
 
-    pub async fn delete_user(&self, user_id: Uuid) -> Result<(), UserRepositoryError> {
+    async fn delete_user(&self, user_id: Uuid) -> Result<(), UserRepositoryError> {
         query(
             r#"
             DELETE FROM users WHERE id = ?
@@ -98,7 +103,7 @@ impl UserRepository {
         Ok(())
     }
 
-    pub async fn get_users(&self) -> Result<Vec<UserRow>, UserRepositoryError> {
+    async fn get_users(&self) -> Result<Vec<UserRow>, UserRepositoryError> {
         let users = query_as::<_, UserRow>(
             r#"
             SELECT id, name, email FROM users
@@ -110,7 +115,7 @@ impl UserRepository {
 
         Ok(users)
     }
-    pub async fn get_users_by_role(&self, role_id: Uuid) -> Result<Vec<UserRow>, UserRepositoryError> {
+    async fn get_users_by_role(&self, role_id: Uuid) -> Result<Vec<UserRow>, UserRepositoryError> {
         let users = query_as::<_, UserRow>(
             r#"
             SELECT u.id, u.name, u.email

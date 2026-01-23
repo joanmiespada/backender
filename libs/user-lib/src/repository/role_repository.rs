@@ -1,8 +1,10 @@
+use async_trait::async_trait;
 use sqlx::{query, query_as, MySqlPool};
 use uuid::Uuid;
 
 use crate::repository::errors::{map_sqlx_error, UserRepositoryError};
 use crate::repository::models::RoleRow;
+use crate::repository::traits::RoleRepositoryTrait;
 
 #[derive(Debug, Clone)]
 pub struct RoleRepository {
@@ -13,8 +15,11 @@ impl RoleRepository {
     pub fn new(pool: MySqlPool) -> Self {
         Self { pool }
     }
+}
 
-    pub async fn create_role(&self, name: &str) -> Result<RoleRow, UserRepositoryError> {
+#[async_trait]
+impl RoleRepositoryTrait for RoleRepository {
+    async fn create_role(&self, name: &str) -> Result<RoleRow, UserRepositoryError> {
         let id = Uuid::new_v4();
         query(
             r#"
@@ -38,7 +43,7 @@ impl RoleRepository {
         Ok(role)
     }
 
-    pub async fn get_role(&self, role_id: Uuid) -> Result<Option<RoleRow>, UserRepositoryError> {
+    async fn get_role(&self, role_id: Uuid) -> Result<Option<RoleRow>, UserRepositoryError> {
         let role = query_as::<_, RoleRow>(
             r#"
             SELECT id, name FROM roles WHERE id = ?
@@ -51,7 +56,7 @@ impl RoleRepository {
         Ok(role)
     }
 
-    pub async fn update_role(&self, role_id: Uuid, name: &str) -> Result<RoleRow, UserRepositoryError> {
+    async fn update_role(&self, role_id: Uuid, name: &str) -> Result<RoleRow, UserRepositoryError> {
         query(
             r#"
             UPDATE roles
@@ -75,7 +80,7 @@ impl RoleRepository {
         Ok(role)
     }
 
-    pub async fn delete_role(&self, role_id: Uuid) -> Result<(), UserRepositoryError> {
+    async fn delete_role(&self, role_id: Uuid) -> Result<(), UserRepositoryError> {
         sqlx::query(
             r#"
             DELETE FROM roles WHERE id = ?
@@ -88,7 +93,7 @@ impl RoleRepository {
         Ok(())
     }
 
-    pub async fn get_roles_for_user(&self, user_id: Uuid) -> Result<Vec<RoleRow>, UserRepositoryError> {
+    async fn get_roles_for_user(&self, user_id: Uuid) -> Result<Vec<RoleRow>, UserRepositoryError> {
         let roles = query_as::<_, RoleRow>(
             r#"
             SELECT r.id, r.name
@@ -104,7 +109,7 @@ impl RoleRepository {
         Ok(roles)
     }
 
-    pub async fn get_roles(&self) -> Result<Vec<RoleRow>, UserRepositoryError> {
+    async fn get_roles(&self) -> Result<Vec<RoleRow>, UserRepositoryError> {
         let roles = query_as::<_, RoleRow>(
             r#"
             SELECT id, name FROM roles

@@ -1,6 +1,8 @@
+use async_trait::async_trait;
 use sqlx::{query, MySqlPool};
 
 use crate::repository::errors::{map_sqlx_error, UserRepositoryError};
+use crate::repository::traits::UserRoleRepositoryTrait;
 
 #[derive(Debug, Clone)]
 pub struct UserRoleRepository {
@@ -11,8 +13,11 @@ impl UserRoleRepository {
     pub fn new(pool: MySqlPool) -> Self {
         Self { pool }
     }
+}
 
-    pub async fn assign_role(&self, user_id: &str, role_id: &str) -> Result<(), UserRepositoryError> {
+#[async_trait]
+impl UserRoleRepositoryTrait for UserRoleRepository {
+    async fn assign_role(&self, user_id: &str, role_id: &str) -> Result<(), UserRepositoryError> {
         query(
             r#"
             INSERT INTO user_roles (user_id, role_id)
@@ -28,7 +33,7 @@ impl UserRoleRepository {
         Ok(())
     }
 
-    pub async fn unassign_role(&self, user_id: &str, role_id: &str) -> Result<(), UserRepositoryError> {
+    async fn unassign_role(&self, user_id: &str, role_id: &str) -> Result<(), UserRepositoryError> {
         query(
             r#"
             DELETE FROM user_roles
