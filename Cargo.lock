@@ -3452,10 +3452,14 @@ dependencies = [
 name = "user-api"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "axum",
+ "http-body-util",
+ "mockall",
  "serde",
  "serde_json",
  "tokio",
+ "tower",
  "tower-http",
  "tracing",
  "tracing-ecs",

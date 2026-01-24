@@ -28,3 +28,7 @@ user-lib = { path = "../../libs/user-lib" }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
+mockall = "0.13"
+async-trait = "0.1"
