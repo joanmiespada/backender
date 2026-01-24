@@ -1,6 +1,7 @@
-use std::{str::FromStr, thread, time::Duration};
+use std::{str::FromStr, time::Duration};
 
 use sqlx::{mysql::{MySqlConnectOptions, MySqlPoolOptions}, MySqlPool};
+use tokio::time::sleep;
 
 #[allow(dead_code)]
 pub async fn connect_with_retry(database_url: &str, max_retries: u32) -> MySqlPool {
@@ -20,7 +21,7 @@ pub async fn connect_with_retry(database_url: &str, max_retries: u32) -> MySqlPo
             Err(e) if retries < max_retries => {
                 eprintln!("MySQL not ready yet (attempt {}): {:?}", retries + 1, e);
                 retries += 1;
-                thread::sleep(Duration::from_secs(1));
+                sleep(Duration::from_secs(1)).await;
             }
             Err(e) => panic!("Failed to connect to MySQL after {} retries: {:?}", max_retries, e),
         }
