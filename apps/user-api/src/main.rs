@@ -4,7 +4,7 @@ mod constants;
 mod methods;
 
 use axum::{
-    routing::get,
+    routing::{get, post},
     Router,
 };
 use tokio;
@@ -29,18 +29,53 @@ use crate::methods::get_user_by_id::get_user_by_id;
 use crate::methods::get_user_by_id::__path_get_user_by_id;
 use crate::methods::get_users::get_users;
 use crate::methods::get_users::__path_get_users;
-use crate::methods::entities::{CreateUserRequest, UserResponse, PaginatedResponse};
+use crate::methods::update_user::update_user;
+use crate::methods::update_user::__path_update_user;
+use crate::methods::delete_user::delete_user;
+use crate::methods::delete_user::__path_delete_user;
+use crate::methods::create_role::create_role;
+use crate::methods::create_role::__path_create_role;
+use crate::methods::get_role_by_id::get_role_by_id;
+use crate::methods::get_role_by_id::__path_get_role_by_id;
+use crate::methods::get_roles::get_roles;
+use crate::methods::get_roles::__path_get_roles;
+use crate::methods::update_role::update_role;
+use crate::methods::update_role::__path_update_role;
+use crate::methods::delete_role::delete_role;
+use crate::methods::delete_role::__path_delete_role;
+use crate::methods::assign_role::assign_role;
+use crate::methods::assign_role::__path_assign_role;
+use crate::methods::unassign_role::unassign_role;
+use crate::methods::unassign_role::__path_unassign_role;
+use crate::methods::entities::{
+    CreateUserRequest, UpdateUserRequest, UserResponse,
+    CreateRoleRequest, UpdateRoleRequest, RoleResponse,
+    PaginatedResponse
+};
 use crate::state::AppState;
-use crate::methods::routes::{USERS_PATH, USERS_BY_ID_PATH, SERVICE_HEALTH_PATH, SERVICE_DOCS_PATH};
+use crate::methods::routes::{
+    USERS_PATH, USERS_BY_ID_PATH, USER_ROLES_PATH,
+    ROLES_PATH, ROLES_BY_ID_PATH,
+    SERVICE_HEALTH_PATH, SERVICE_DOCS_PATH
+};
 use crate::constants::{ENV, ELASTIC_URL, DATABASE_URL};
 
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(create_user, get_user_by_id, get_users),
-    components(schemas(CreateUserRequest, UserResponse, PaginatedResponse<UserResponse>)),
+    paths(
+        create_user, get_user_by_id, get_users, update_user, delete_user,
+        create_role, get_role_by_id, get_roles, update_role, delete_role,
+        assign_role, unassign_role
+    ),
+    components(schemas(
+        CreateUserRequest, UpdateUserRequest, UserResponse,
+        CreateRoleRequest, UpdateRoleRequest, RoleResponse,
+        PaginatedResponse<UserResponse>, PaginatedResponse<RoleResponse>
+    )),
     tags(
-        (name = "users", description = "User management endpoints")
+        (name = "users", description = "User management endpoints"),
+        (name = "roles", description = "Role management endpoints")
     )
 )]
 struct ApiDoc;
@@ -92,8 +127,14 @@ async fn main() {
     // Build application with routes
     let app = Router::new()
         .route(SERVICE_HEALTH_PATH, get(health_check))
+        // User endpoints
         .route(USERS_PATH, get(get_users).post(create_user))
-        .route(USERS_BY_ID_PATH, get(get_user_by_id))
+        .route(USERS_BY_ID_PATH, get(get_user_by_id).put(update_user).delete(delete_user))
+        // Role endpoints
+        .route(ROLES_PATH, get(get_roles).post(create_role))
+        .route(ROLES_BY_ID_PATH, get(get_role_by_id).put(update_role).delete(delete_role))
+        // User-role assignment endpoints
+        .route(USER_ROLES_PATH, post(assign_role).delete(unassign_role))
         .merge(SwaggerUi::new(SERVICE_DOCS_PATH).url("/api-doc/openapi.json", ApiDoc::openapi()))
         .with_state(AppState { user_service: Arc::new(user_service), env: env.clone() })
         // Log one line per request/response at DEBUG (method, path, status, latency)

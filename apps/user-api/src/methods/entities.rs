@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use user_lib::entities::{User, PaginatedResult, PaginationParams};
+use user_lib::entities::{User, Role, PaginatedResult, PaginationParams};
 use uuid::Uuid;
 use utoipa::{ToSchema, IntoParams};
 
@@ -9,11 +9,18 @@ pub struct CreateUserRequest {
     pub email: String,
 }
 
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+pub struct UpdateUserRequest {
+    pub name: String,
+    pub email: String,
+}
+
 #[derive(Debug, Serialize, ToSchema)]
 pub struct UserResponse {
     pub id: Uuid,
     pub name: String,
     pub email: String,
+    pub roles: Vec<RoleResponse>,
 }
 
 impl From<User> for UserResponse {
@@ -22,6 +29,32 @@ impl From<User> for UserResponse {
             id: user.id,
             name: user.name,
             email: user.email,
+            roles: user.roles.into_iter().map(RoleResponse::from).collect(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+pub struct CreateRoleRequest {
+    pub name: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+pub struct UpdateRoleRequest {
+    pub name: String,
+}
+
+#[derive(Debug, Serialize, ToSchema, Clone)]
+pub struct RoleResponse {
+    pub id: Uuid,
+    pub name: String,
+}
+
+impl From<Role> for RoleResponse {
+    fn from(role: Role) -> Self {
+        RoleResponse {
+            id: role.id,
+            name: role.name,
         }
     }
 }
