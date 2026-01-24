@@ -1,3 +1,4 @@
-DROP TABLE user IF EXISTS;
-DROP TABLE role IF EXISTS;
-DROP TABLE user_role IF EXISTS;
+-- Drop in reverse order due to foreign key constraints
+DROP TABLE IF EXISTS user_roles;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS roles;

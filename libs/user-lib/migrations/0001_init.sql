@@ -21,3 +21,15 @@ CREATE TABLE user_roles (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE
 );
+
+-- Seed default roles
+INSERT INTO roles (id, name) VALUES
+    ('00000000-0000-0000-0000-000000000001', 'admin'),
+    ('00000000-0000-0000-0000-000000000002', 'user');
+
+-- Seed root user with admin role
+INSERT INTO users (id, name, email) VALUES
+    ('00000000-0000-0000-0000-000000000001', 'root', 'root@localhost');
+
+INSERT INTO user_roles (user_id, role_id) VALUES
+    ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001');
