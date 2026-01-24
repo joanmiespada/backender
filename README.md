@@ -2,11 +2,23 @@
 
 Spin up the full backend shared platform locally.
 
+## Quick Start
+
+```bash
+# Install dependencies (macOS)
+brew install just mysql-client
+cargo install cargo-watch
+
+# Start dev environment with hot-reload
+just dev
+```
+
 ## Brew dependencies
 
 ```bash
 brew install mysql-client
 brew install dnsmasq
+brew install just
 ```
 
 ## Included Services
@@ -156,9 +168,31 @@ docker compose -f docker-compose.local.yml up -d mysql
 cargo test --package user-lib --test user_service_test
 ```
 
+## Development Commands (just)
+
+This project uses [just](https://github.com/casey/just) as a command runner.
+
+```bash
+just              # Show all available commands
+just dev          # Start Docker + API with hot-reload (cargo watch)
+just run          # Start Docker + API (no hot-reload)
+just test         # Run all tests
+just test-watch   # Run tests with hot-reload
+just test-bdd     # Run BDD tests only
+just up           # Start Docker containers
+just down         # Stop Docker containers
+just migrate      # Run database migrations
+just logs         # Show Docker logs
+just fmt          # Format code
+just lint         # Run clippy
+just build        # Build all packages
+```
+
 ## Command line tool
 
 $backcli is the command line to perform operations with services. For example, for running migrations databases:
 
-DATABASE_URL=mysql://testuser:password@localhost:3306/testdb cargo run -p backcli -- --migrations --user-lib  // execute migrations of user-lib package
+```bash
+DATABASE_URL=mysql://testuser:password@localhost:3306/testdb cargo run -p backcli -- --migrations --user-lib
+```
 
