@@ -257,9 +257,11 @@ async fn main() {
     }
 
     // 7. Rate limiting layer (outermost)
+    // Calculate milliseconds between requests: 60000ms / requests_per_minute
+    let replenish_interval_ms = 60_000 / middleware_config.rate_limit_per_minute as u64;
     let governor_conf = Arc::new(
         GovernorConfigBuilder::default()
-            .per_second(60 / middleware_config.rate_limit_per_minute as u64)
+            .per_millisecond(replenish_interval_ms)
             .burst_size(middleware_config.rate_limit_burst)
             .finish()
             .expect("failed to build governor config"),

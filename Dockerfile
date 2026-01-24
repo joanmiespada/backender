@@ -18,14 +18,18 @@ COPY libs/user-lib/Cargo.toml libs/user-lib/Cargo.toml
 
 # Dummy build to cache deps
 # Cargo loads workspace members during dependency resolution; each member must have at least one target file.
+# Also create dummy test files referenced in Cargo.toml
 RUN mkdir -p apps/user-api/src \
  && echo "fn main() {}" > apps/user-api/src/main.rs \
+ && echo "pub fn _dummy() {}" > apps/user-api/src/lib.rs \
  && mkdir -p apps/backcli/src \
  && echo "fn main() {}" > apps/backcli/src/main.rs \
  && mkdir -p libs/user-lib/src \
- && echo "pub fn _dummy() {}" > libs/user-lib/src/lib.rs
+ && echo "pub fn _dummy() {}" > libs/user-lib/src/lib.rs \
+ && mkdir -p libs/user-lib/tests \
+ && echo "fn main() {}" > libs/user-lib/tests/bdd.rs
 RUN cargo build -p user-api --release
-RUN rm -rf apps/user-api/src apps/backcli/src libs/user-lib/src
+RUN rm -rf apps/user-api/src apps/backcli/src libs/user-lib/src libs/user-lib/tests
 
 # Copy real sources
 COPY apps ./apps
