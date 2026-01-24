@@ -2,6 +2,7 @@
 mod state;
 mod constants;
 mod methods;
+mod error;
 
 use axum::{
     routing::{get, post},

@@ -1,5 +1,6 @@
 use axum::Json;
 use uuid::Uuid;
+use crate::error::{ApiError, handle_service_error};
 use crate::methods::entities::UserResponse;
 use crate::state::AppState;
 use crate::methods::routes::USERS_BY_ID_PATH;
@@ -21,25 +22,13 @@ use crate::methods::routes::USERS_BY_ID_PATH;
 pub async fn get_user_by_id(
     axum::extract::Path(id): axum::extract::Path<String>,
     axum::extract::State(state): axum::extract::State<AppState>,
-) -> Result<Json<UserResponse>, (axum::http::StatusCode, String)> {
-    let user_service = state.user_service.clone();
-    let env = state.env.clone();
-    let prod_like = state.is_prod_like();
-    match Uuid::parse_str(&id) {
-        Ok(parsed_id) => {
-            match user_service.get_user(parsed_id).await {
-                Ok(Some(user)) => Ok(Json(UserResponse::from(user))),
-                Ok(None) => Err((axum::http::StatusCode::NOT_FOUND, "user not found".to_string())),
-                Err(e) => {
-                    tracing::error!(env = %env, error = ?e, "get_user failed");
-                    if prod_like {
-                        Err((axum::http::StatusCode::INTERNAL_SERVER_ERROR, "internal server error".to_string()))
-                    } else {
-                        Err((axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
-                    }
-                }
-            }
-        }
-        Err(_) => Err((axum::http::StatusCode::BAD_REQUEST, "invalid uuid".to_string())),
-    }
+) -> Result<Json<UserResponse>, ApiError> {
+    let parsed_id = Uuid::parse_str(&id).map_err(|_| ApiError::invalid_uuid())?;
+
+    state.user_service
+        .get_user(parsed_id)
+        .await
+        .map_err(|e| handle_service_error(e, &state.env, "get_user"))?
+        .map(|user| Json(UserResponse::from(user)))
+        .ok_or_else(|| ApiError::user_not_found())
 }
