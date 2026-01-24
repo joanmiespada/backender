@@ -6,6 +6,7 @@ use crate::methods::routes::USERS_BY_ID_PATH;
 #[utoipa::path(
     delete,
     path = USERS_BY_ID_PATH,
+    tag = "users",
     params(
         ("id" = String, Path, description = "User ID (UUID)")
     ),

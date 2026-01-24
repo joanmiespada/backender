@@ -6,6 +6,7 @@ use crate::methods::routes::USERS_PATH;
 #[utoipa::path(
     get,
     path = USERS_PATH,
+    tag = "users",
     params(PaginationQuery),
     responses(
         (status = 200, description = "List of users", body = PaginatedResponse<UserResponse>),

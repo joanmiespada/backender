@@ -7,13 +7,14 @@ use crate::methods::routes::USERS_BY_ID_PATH;
 #[utoipa::path(
     get,
     path = USERS_BY_ID_PATH,
+    tag = "users",
     params(
         ("id" = String, Path, description = "User ID (UUID)")
     ),
     responses(
         (status = 200, description = "User found", body = UserResponse),
-        (status = 404, description = "User not found"),
         (status = 400, description = "Invalid UUID"),
+        (status = 404, description = "User not found"),
         (status = 500, description = "Internal server error"),
     )
 )]

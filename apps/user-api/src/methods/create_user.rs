@@ -7,9 +7,10 @@ use crate::methods::routes::USERS_PATH;
 #[utoipa::path(
     post,
     path = USERS_PATH,
+    tag = "users",
     request_body = CreateUserRequest,
     responses(
-        (status = 200, description = "User created successfully", body = UserResponse),
+        (status = 201, description = "User created successfully", body = UserResponse),
         (status = 400, description = "Validation error"),
         (status = 409, description = "Email already exists"),
         (status = 500, description = "Internal server error"),

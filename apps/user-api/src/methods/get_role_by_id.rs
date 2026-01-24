@@ -7,13 +7,14 @@ use crate::methods::routes::ROLES_BY_ID_PATH;
 #[utoipa::path(
     get,
     path = ROLES_BY_ID_PATH,
+    tag = "roles",
     params(
         ("id" = String, Path, description = "Role ID (UUID)")
     ),
     responses(
         (status = 200, description = "Role found", body = RoleResponse),
-        (status = 404, description = "Role not found"),
         (status = 400, description = "Invalid UUID"),
+        (status = 404, description = "Role not found"),
         (status = 500, description = "Internal server error"),
     )
 )]

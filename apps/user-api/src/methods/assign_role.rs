@@ -13,6 +13,7 @@ pub struct UserRolePath {
 #[utoipa::path(
     post,
     path = USER_ROLES_PATH,
+    tag = "users",
     params(
         ("user_id" = String, Path, description = "User ID (UUID)"),
         ("role_id" = String, Path, description = "Role ID (UUID)")

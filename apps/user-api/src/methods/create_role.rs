@@ -7,9 +7,10 @@ use crate::methods::routes::ROLES_PATH;
 #[utoipa::path(
     post,
     path = ROLES_PATH,
+    tag = "roles",
     request_body = CreateRoleRequest,
     responses(
-        (status = 200, description = "Role created successfully", body = RoleResponse),
+        (status = 201, description = "Role created successfully", body = RoleResponse),
         (status = 400, description = "Validation error"),
         (status = 409, description = "Role name already exists"),
         (status = 500, description = "Internal server error"),

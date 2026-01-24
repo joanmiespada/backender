@@ -6,6 +6,7 @@ use crate::methods::routes::ROLES_PATH;
 #[utoipa::path(
     get,
     path = ROLES_PATH,
+    tag = "roles",
     params(PaginationQuery),
     responses(
         (status = 200, description = "List of roles", body = PaginatedResponse<RoleResponse>),

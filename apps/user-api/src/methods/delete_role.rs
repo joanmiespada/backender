@@ -6,6 +6,7 @@ use crate::methods::routes::ROLES_BY_ID_PATH;
 #[utoipa::path(
     delete,
     path = ROLES_BY_ID_PATH,
+    tag = "roles",
     params(
         ("id" = String, Path, description = "Role ID (UUID)")
     ),
