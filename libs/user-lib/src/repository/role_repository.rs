@@ -114,6 +114,11 @@ impl RoleRepositoryTrait for RoleRepository {
         if user_ids.is_empty() {
             return Ok(vec![]);
         }
+
+        // SAFETY: This dynamic SQL is safe from injection because:
+        // 1. Only placeholder characters (?) are interpolated into the query string
+        // 2. All actual user_id values are bound as parameters via .bind()
+        // 3. SQLx doesn't support variable-length IN clauses directly, so this pattern is necessary
         let placeholders = user_ids.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
         let query_str = format!(
             r#"
@@ -124,6 +129,7 @@ impl RoleRepositoryTrait for RoleRepository {
             "#,
             placeholders
         );
+
         let mut query = sqlx::query_as::<_, UserRoleMapping>(&query_str);
         for user_id in user_ids {
             query = query.bind(user_id);

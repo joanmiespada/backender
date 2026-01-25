@@ -95,10 +95,18 @@ struct ApiDoc;
 
 #[tokio::main]
 async fn main() {
+    if let Err(e) = run().await {
+        eprintln!("Fatal error: {}", e);
+        std::process::exit(1);
+    }
+}
+
+async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // Setup tracing subscriber
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
-    let env = std::env::var(ENV).expect(format!("{} must be set", ENV).as_str());
+    let env = std::env::var(ENV)
+        .map_err(|_| format!("{} environment variable must be set", ENV))?;
 
     // We don't send logs directly to Elasticsearch from the app.
     let _elastic_url = std::env::var(ELASTIC_URL).ok();
@@ -134,10 +142,10 @@ async fn main() {
     );
 
     // Setup database pool
-    let database_url =
-        std::env::var(DATABASE_URL).expect(format!("{} must be set", DATABASE_URL).as_str());
+    let database_url = std::env::var(DATABASE_URL)
+        .map_err(|_| format!("{} environment variable must be set", DATABASE_URL))?;
 
-    let pool = connect_with_retry(&database_url, 10).await;
+    let pool = connect_with_retry(&database_url, 10).await?;
 
     // Create shared service
     let user_service = UserService::new(
@@ -279,7 +287,8 @@ async fn main() {
     let addr = format!("0.0.0.0:{}", port);
     let public_url = format!("http://127.0.0.1:{}", port);
 
-    let listener = TcpListener::bind(&addr).await.unwrap();
+    let listener = TcpListener::bind(&addr).await
+        .map_err(|e| format!("Failed to bind to {}: {}", addr, e))?;
 
     tracing::info!(
         "user-api is ready to accept requests at: {}",
@@ -297,5 +306,7 @@ async fn main() {
     )
     .with_graceful_shutdown(shutdown_signal(middleware_config.shutdown_timeout))
     .await
-    .unwrap();
+    .map_err(|e| format!("Server error: {}", e))?;
+
+    Ok(())
 }

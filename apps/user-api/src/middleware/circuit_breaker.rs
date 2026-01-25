@@ -20,8 +20,16 @@
 
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
+
+/// Get current time as milliseconds since UNIX epoch
+fn current_time_millis() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CircuitState {
@@ -81,10 +89,11 @@ impl CircuitBreaker {
             CircuitState::Closed => true,
             CircuitState::Open => {
                 // Check if reset timeout has passed
-                let last_failure = self.last_failure_time.load(Ordering::SeqCst);
-                let now = Instant::now().elapsed().as_secs();
+                let last_failure_millis = self.last_failure_time.load(Ordering::SeqCst);
+                let now_millis = current_time_millis();
+                let elapsed_millis = now_millis.saturating_sub(last_failure_millis);
 
-                if now.saturating_sub(last_failure) >= self.config.reset_timeout.as_secs() {
+                if elapsed_millis >= self.config.reset_timeout.as_millis() as u64 {
                     // Transition to HalfOpen
                     let mut state = self.state.write().await;
                     if *state == CircuitState::Open {
@@ -126,10 +135,7 @@ impl CircuitBreaker {
     pub async fn record_failure(&self) {
         let mut state = self.state.write().await;
 
-        self.last_failure_time.store(
-            Instant::now().elapsed().as_secs(),
-            Ordering::SeqCst,
-        );
+        self.last_failure_time.store(current_time_millis(), Ordering::SeqCst);
 
         match *state {
             CircuitState::Closed => {

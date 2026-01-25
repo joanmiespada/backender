@@ -38,18 +38,68 @@ fn validate_email(email: &str) -> Result<(), UserServiceError> {
             format!("email cannot exceed {} characters", MAX_EMAIL_LENGTH)
         ));
     }
-    // Basic email format validation: must contain exactly one @ with text before and after
+
+    // Must contain exactly one @
     let at_count = email.matches('@').count();
     if at_count != 1 {
         return Err(UserServiceError::Validation("email must contain exactly one @".to_string()));
     }
+
     let parts: Vec<&str> = email.split('@').collect();
-    if parts[0].is_empty() || parts[1].is_empty() {
-        return Err(UserServiceError::Validation("email has invalid format".to_string()));
+    let local = parts[0];
+    let domain = parts[1];
+
+    // Validate local part
+    if local.is_empty() || local.len() > 64 {
+        return Err(UserServiceError::Validation("email local part is invalid".to_string()));
     }
-    if !parts[1].contains('.') {
+    if local.starts_with('.') || local.ends_with('.') {
+        return Err(UserServiceError::Validation("email local part cannot start or end with a dot".to_string()));
+    }
+    if local.contains("..") {
+        return Err(UserServiceError::Validation("email local part cannot contain consecutive dots".to_string()));
+    }
+    // Allow alphanumeric, dots, hyphens, underscores, and plus signs in local part
+    for c in local.chars() {
+        if !c.is_ascii_alphanumeric() && !".+-_".contains(c) {
+            return Err(UserServiceError::Validation(format!(
+                "email local part contains invalid character: {}", c
+            )));
+        }
+    }
+
+    // Validate domain part
+    if domain.is_empty() || domain.len() > 255 {
+        return Err(UserServiceError::Validation("email domain is invalid".to_string()));
+    }
+    if !domain.contains('.') {
         return Err(UserServiceError::Validation("email domain must contain a dot".to_string()));
     }
+    if domain.starts_with('.') || domain.ends_with('.') {
+        return Err(UserServiceError::Validation("email domain cannot start or end with a dot".to_string()));
+    }
+    if domain.starts_with('-') || domain.ends_with('-') {
+        return Err(UserServiceError::Validation("email domain cannot start or end with a hyphen".to_string()));
+    }
+    if domain.contains("..") {
+        return Err(UserServiceError::Validation("email domain cannot contain consecutive dots".to_string()));
+    }
+
+    // Validate TLD (at least 2 characters)
+    let tld = domain.rsplit('.').next().unwrap_or("");
+    if tld.len() < 2 {
+        return Err(UserServiceError::Validation("email domain must have a valid TLD".to_string()));
+    }
+
+    // Allow alphanumeric, dots, and hyphens in domain
+    for c in domain.chars() {
+        if !c.is_ascii_alphanumeric() && !".-".contains(c) {
+            return Err(UserServiceError::Validation(format!(
+                "email domain contains invalid character: {}", c
+            )));
+        }
+    }
+
     Ok(())
 }
 

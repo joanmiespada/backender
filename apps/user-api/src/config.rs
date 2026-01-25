@@ -1,9 +1,32 @@
+use std::net::IpAddr;
 use std::time::Duration;
 
 use crate::constants::{
     CORS_ALLOWED_ORIGINS, IP_ALLOWLIST, IP_BLOCKLIST, MAX_BODY_SIZE_BYTES,
     RATE_LIMIT_BURST, RATE_LIMIT_PER_MINUTE, REQUEST_TIMEOUT_SECS, SHUTDOWN_TIMEOUT_SECS,
 };
+
+/// Validate and parse IP addresses from a comma-separated string.
+/// Returns only valid IP addresses and logs warnings for invalid ones.
+fn parse_ip_list(env_var: &str, value: &str) -> Vec<String> {
+    value
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .filter(|s| {
+            if s.parse::<IpAddr>().is_ok() {
+                true
+            } else {
+                tracing::warn!(
+                    env_var = env_var,
+                    invalid_ip = s,
+                    "ignoring invalid IP address in configuration"
+                );
+                false
+            }
+        })
+        .collect()
+}
 
 #[derive(Debug, Clone)]
 pub struct MiddlewareConfig {
@@ -68,22 +91,12 @@ impl MiddlewareConfig {
 
         let ip_allowlist = std::env::var(IP_ALLOWLIST)
             .ok()
-            .map(|v| {
-                v.split(',')
-                    .map(|s| s.trim().to_string())
-                    .filter(|s| !s.is_empty())
-                    .collect()
-            })
+            .map(|v| parse_ip_list(IP_ALLOWLIST, &v))
             .unwrap_or(default.ip_allowlist);
 
         let ip_blocklist = std::env::var(IP_BLOCKLIST)
             .ok()
-            .map(|v| {
-                v.split(',')
-                    .map(|s| s.trim().to_string())
-                    .filter(|s| !s.is_empty())
-                    .collect()
-            })
+            .map(|v| parse_ip_list(IP_BLOCKLIST, &v))
             .unwrap_or(default.ip_blocklist);
 
         Self {
