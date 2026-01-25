@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Duration;
 use async_trait::async_trait;
 use axum::{http::StatusCode, response::IntoResponse};
 use mockall::mock;
@@ -10,6 +11,7 @@ use user_lib::repository::models::{RoleRow, UserRow, UserRoleMapping};
 use user_lib::repository::traits::{RoleRepositoryTrait, UserRepositoryTrait, UserRoleRepositoryTrait};
 use user_lib::user_service::UserService;
 
+use user_api::cache::{CacheConfig, CachedUserService, RedisCache};
 use user_api::state::AppState;
 use user_api::methods::entities::{
     CreateUserRequest, UserResponse, RoleResponse, PaginationQuery,
@@ -60,25 +62,43 @@ mock! {
 
 type TestAppState = AppState<MockUserRepo, MockRoleRepo, MockUserRoleRepo>;
 
-fn create_test_service(
+fn create_disabled_cache_config() -> CacheConfig {
+    CacheConfig {
+        enabled: false,
+        redis_host: "localhost".to_string(),
+        redis_port: 6379,
+        redis_db: 0,
+        pool_size: 10,
+        default_ttl: Duration::from_secs(300),
+        user_ttl: Duration::from_secs(300),
+        role_ttl: Duration::from_secs(600),
+        list_ttl: Duration::from_secs(60),
+    }
+}
+
+async fn create_test_service(
     user_repo: MockUserRepo,
     role_repo: MockRoleRepo,
     user_role_repo: MockUserRoleRepo,
-) -> UserService<MockUserRepo, MockRoleRepo, MockUserRoleRepo> {
-    UserService::with_repos(
+) -> CachedUserService<MockUserRepo, MockRoleRepo, MockUserRoleRepo> {
+    let inner = UserService::with_repos(
         Arc::new(user_repo),
         Arc::new(role_repo),
         Arc::new(user_role_repo),
-    )
+    );
+    // Create a disabled cache for tests (no Redis needed)
+    let cache_config = create_disabled_cache_config();
+    let cache = RedisCache::new(&cache_config).await;
+    CachedUserService::new(Arc::new(inner), cache, cache_config)
 }
 
-fn create_test_state(
+async fn create_test_state(
     user_repo: MockUserRepo,
     role_repo: MockRoleRepo,
     user_role_repo: MockUserRoleRepo,
     env: &str,
 ) -> TestAppState {
-    let service = create_test_service(user_repo, role_repo, user_role_repo);
+    let service = create_test_service(user_repo, role_repo, user_role_repo).await;
     TestAppState {
         user_service: Arc::new(service),
         env: env.to_string(),
@@ -106,7 +126,7 @@ async fn test_create_user_handler_success() {
             })
         });
 
-    let state = create_test_state(user_repo, role_repo, user_role_repo, "test");
+    let state = create_test_state(user_repo, role_repo, user_role_repo, "test").await;
     let payload = CreateUserRequest {
         name: "John Doe".to_string(),
         email: "john@example.com".to_string(),
@@ -134,7 +154,7 @@ async fn test_create_user_handler_email_conflict() {
         .times(1)
         .returning(|_, _| Err(UserRepositoryError::EmailAlreadyExists));
 
-    let state = create_test_state(user_repo, role_repo, user_role_repo, "test");
+    let state = create_test_state(user_repo, role_repo, user_role_repo, "test").await;
 
     let result = state.user_service
         .create_user("John Doe", "existing@example.com")
@@ -151,7 +171,7 @@ async fn test_create_user_handler_validation_error_empty_name() {
     let role_repo = MockRoleRepo::new();
     let user_role_repo = MockUserRoleRepo::new();
 
-    let state = create_test_state(user_repo, role_repo, user_role_repo, "test");
+    let state = create_test_state(user_repo, role_repo, user_role_repo, "test").await;
 
     let result = state.user_service
         .create_user("", "test@example.com")
@@ -168,7 +188,7 @@ async fn test_create_user_handler_validation_error_invalid_email() {
     let role_repo = MockRoleRepo::new();
     let user_role_repo = MockUserRoleRepo::new();
 
-    let state = create_test_state(user_repo, role_repo, user_role_repo, "test");
+    let state = create_test_state(user_repo, role_repo, user_role_repo, "test").await;
 
     let result = state.user_service
         .create_user("John Doe", "invalid-email")
@@ -211,7 +231,7 @@ async fn test_get_user_by_id_handler_success() {
             }])
         });
 
-    let state = create_test_state(user_repo, role_repo, user_role_repo, "test");
+    let state = create_test_state(user_repo, role_repo, user_role_repo, "test").await;
 
     let result = state.user_service.get_user(user_id).await;
 
@@ -234,7 +254,7 @@ async fn test_get_user_by_id_handler_not_found() {
         .times(1)
         .returning(|_| Ok(None));
 
-    let state = create_test_state(user_repo, role_repo, user_role_repo, "test");
+    let state = create_test_state(user_repo, role_repo, user_role_repo, "test").await;
     let user_id = Uuid::new_v4();
 
     let result = state.user_service.get_user(user_id).await;
@@ -277,7 +297,7 @@ async fn test_get_users_handler_success() {
         .times(1)
         .returning(|_| Ok(vec![]));
 
-    let state = create_test_state(user_repo, role_repo, user_role_repo, "test");
+    let state = create_test_state(user_repo, role_repo, user_role_repo, "test").await;
     let pagination = PaginationParams { page: 1, page_size: 2 };
 
     let result = state.user_service.get_users(pagination).await;
@@ -302,7 +322,7 @@ async fn test_get_users_handler_empty() {
         .times(1)
         .returning(|_| Ok((vec![], 0)));
 
-    let state = create_test_state(user_repo, role_repo, user_role_repo, "test");
+    let state = create_test_state(user_repo, role_repo, user_role_repo, "test").await;
     let pagination = PaginationParams::default();
 
     let result = state.user_service.get_users(pagination).await;
@@ -339,7 +359,7 @@ async fn test_update_user_handler_success() {
         .times(1)
         .returning(|_| Ok(vec![]));
 
-    let state = create_test_state(user_repo, role_repo, user_role_repo, "test");
+    let state = create_test_state(user_repo, role_repo, user_role_repo, "test").await;
 
     let result = state.user_service
         .update_user(user_id, "Updated Name", "updated@example.com")
@@ -362,7 +382,7 @@ async fn test_update_user_handler_email_conflict() {
         .times(1)
         .returning(|_, _, _| Err(UserRepositoryError::EmailAlreadyExists));
 
-    let state = create_test_state(user_repo, role_repo, user_role_repo, "test");
+    let state = create_test_state(user_repo, role_repo, user_role_repo, "test").await;
     let user_id = Uuid::new_v4();
 
     let result = state.user_service
@@ -379,7 +399,7 @@ async fn test_update_user_handler_validation_error() {
     let role_repo = MockRoleRepo::new();
     let user_role_repo = MockUserRoleRepo::new();
 
-    let state = create_test_state(user_repo, role_repo, user_role_repo, "test");
+    let state = create_test_state(user_repo, role_repo, user_role_repo, "test").await;
     let user_id = Uuid::new_v4();
 
     let result = state.user_service
@@ -403,7 +423,7 @@ async fn test_delete_user_handler_success() {
         .times(1)
         .returning(|_| Ok(()));
 
-    let state = create_test_state(user_repo, role_repo, user_role_repo, "test");
+    let state = create_test_state(user_repo, role_repo, user_role_repo, "test").await;
     let user_id = Uuid::new_v4();
 
     let result = state.user_service.delete_user(user_id).await;
@@ -432,7 +452,7 @@ async fn test_create_role_handler_success() {
             })
         });
 
-    let state = create_test_state(user_repo, role_repo, user_role_repo, "test");
+    let state = create_test_state(user_repo, role_repo, user_role_repo, "test").await;
 
     let result = state.user_service.create_role("admin").await;
 
@@ -453,7 +473,7 @@ async fn test_create_role_handler_name_conflict() {
         .times(1)
         .returning(|_| Err(UserRepositoryError::RoleNameAlreadyExists));
 
-    let state = create_test_state(user_repo, role_repo, user_role_repo, "test");
+    let state = create_test_state(user_repo, role_repo, user_role_repo, "test").await;
 
     let result = state.user_service.create_role("admin").await;
 
@@ -467,7 +487,7 @@ async fn test_create_role_handler_validation_error() {
     let role_repo = MockRoleRepo::new();
     let user_role_repo = MockUserRoleRepo::new();
 
-    let state = create_test_state(user_repo, role_repo, user_role_repo, "test");
+    let state = create_test_state(user_repo, role_repo, user_role_repo, "test").await;
 
     let result = state.user_service.create_role("").await;
 
@@ -495,7 +515,7 @@ async fn test_get_role_by_id_handler_success() {
             }))
         });
 
-    let state = create_test_state(user_repo, role_repo, user_role_repo, "test");
+    let state = create_test_state(user_repo, role_repo, user_role_repo, "test").await;
 
     let result = state.user_service.get_role(role_id).await;
 
@@ -516,7 +536,7 @@ async fn test_get_role_by_id_handler_not_found() {
         .times(1)
         .returning(|_| Ok(None));
 
-    let state = create_test_state(user_repo, role_repo, user_role_repo, "test");
+    let state = create_test_state(user_repo, role_repo, user_role_repo, "test").await;
     let role_id = Uuid::new_v4();
 
     let result = state.user_service.get_role(role_id).await;
@@ -552,7 +572,7 @@ async fn test_get_roles_handler_success() {
             ], 2))
         });
 
-    let state = create_test_state(user_repo, role_repo, user_role_repo, "test");
+    let state = create_test_state(user_repo, role_repo, user_role_repo, "test").await;
     let pagination = PaginationParams::default();
 
     let result = state.user_service.get_roles(pagination).await;
@@ -583,7 +603,7 @@ async fn test_update_role_handler_success() {
             })
         });
 
-    let state = create_test_state(user_repo, role_repo, user_role_repo, "test");
+    let state = create_test_state(user_repo, role_repo, user_role_repo, "test").await;
 
     let result = state.user_service.update_role(role_id, "super-admin").await;
 
@@ -603,7 +623,7 @@ async fn test_update_role_handler_name_conflict() {
         .times(1)
         .returning(|_, _| Err(UserRepositoryError::RoleNameAlreadyExists));
 
-    let state = create_test_state(user_repo, role_repo, user_role_repo, "test");
+    let state = create_test_state(user_repo, role_repo, user_role_repo, "test").await;
     let role_id = Uuid::new_v4();
 
     let result = state.user_service.update_role(role_id, "taken-name").await;
@@ -618,7 +638,7 @@ async fn test_update_role_handler_validation_error() {
     let role_repo = MockRoleRepo::new();
     let user_role_repo = MockUserRoleRepo::new();
 
-    let state = create_test_state(user_repo, role_repo, user_role_repo, "test");
+    let state = create_test_state(user_repo, role_repo, user_role_repo, "test").await;
     let role_id = Uuid::new_v4();
 
     let result = state.user_service.update_role(role_id, "   ").await;
@@ -640,7 +660,7 @@ async fn test_delete_role_handler_success() {
         .times(1)
         .returning(|_| Ok(()));
 
-    let state = create_test_state(user_repo, role_repo, user_role_repo, "test");
+    let state = create_test_state(user_repo, role_repo, user_role_repo, "test").await;
     let role_id = Uuid::new_v4();
 
     let result = state.user_service.delete_role(role_id).await;
@@ -661,7 +681,7 @@ async fn test_assign_role_handler_success() {
         .times(1)
         .returning(|_, _| Ok(()));
 
-    let state = create_test_state(user_repo, role_repo, user_role_repo, "test");
+    let state = create_test_state(user_repo, role_repo, user_role_repo, "test").await;
     let user_id = Uuid::new_v4();
     let role_id = Uuid::new_v4();
 
@@ -681,7 +701,7 @@ async fn test_assign_role_handler_already_assigned() {
         .times(1)
         .returning(|_, _| Err(UserRepositoryError::UserAlreadyHasRole));
 
-    let state = create_test_state(user_repo, role_repo, user_role_repo, "test");
+    let state = create_test_state(user_repo, role_repo, user_role_repo, "test").await;
     let user_id = Uuid::new_v4();
     let role_id = Uuid::new_v4();
 
@@ -704,7 +724,7 @@ async fn test_unassign_role_handler_success() {
         .times(1)
         .returning(|_, _| Ok(()));
 
-    let state = create_test_state(user_repo, role_repo, user_role_repo, "test");
+    let state = create_test_state(user_repo, role_repo, user_role_repo, "test").await;
     let user_id = Uuid::new_v4();
     let role_id = Uuid::new_v4();
 

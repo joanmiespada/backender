@@ -1,10 +1,11 @@
-mod state;
-mod constants;
-mod methods;
-mod error;
+mod cache;
 mod config;
-mod shutdown;
+mod constants;
+mod error;
+mod methods;
 mod middleware;
+mod shutdown;
+mod state;
 
 use axum::{
     http::{header, HeaderName, Method, StatusCode},
@@ -35,6 +36,7 @@ use user_lib::repository::user_role_repository::UserRoleRepository;
 use user_lib::user_service::UserService;
 use user_lib::util::connect_with_retry;
 
+use crate::cache::{CacheConfig, CachedUserService, RedisCache};
 use crate::config::MiddlewareConfig;
 use crate::constants::{DATABASE_URL, ELASTIC_URL, ENV, LOCAL_ENV, SERVICE, USER_API_PORT};
 use crate::methods::assign_role::__path_assign_role;
@@ -147,6 +149,23 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     let pool = connect_with_retry(&database_url, 10).await?;
 
+    // Setup cache
+    let cache_config = CacheConfig::from_env();
+    tracing::info!(
+        cache_enabled = cache_config.enabled,
+        redis_host = %cache_config.redis_host,
+        redis_port = cache_config.redis_port,
+        user_ttl_secs = cache_config.user_ttl.as_secs(),
+        role_ttl_secs = cache_config.role_ttl.as_secs(),
+        list_ttl_secs = cache_config.list_ttl.as_secs(),
+        "cache configuration loaded"
+    );
+
+    let redis_cache = RedisCache::new(&cache_config).await;
+    if cache_config.enabled && !redis_cache.is_enabled() {
+        tracing::warn!("Cache was enabled but Redis connection failed - running in DB-only mode");
+    }
+
     // Create shared service
     let user_service = UserService::new(
         UserRepository::new(pool.clone()),
@@ -154,8 +173,14 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         UserRoleRepository::new(pool.clone()),
     );
 
+    let cached_service = CachedUserService::new(
+        Arc::new(user_service),
+        redis_cache,
+        cache_config,
+    );
+
     let app_state = AppState {
-        user_service: Arc::new(user_service),
+        user_service: Arc::new(cached_service),
         env: env.clone(),
     };
 

@@ -27,6 +27,10 @@ tracing-ecs = "0.5"
 
 user-lib = { path = "../../libs/user-lib" }
 
+# Redis caching
+deadpool-redis = "0.18"
+redis = { version = "0.27", features = ["tokio-comp"] }
+
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 tower = { version = "0.5", features = ["util"] }
