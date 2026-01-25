@@ -63,9 +63,10 @@ migrate:
     export DATABASE_URL="mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@127.0.0.1:${MYSQL_PORT}/${MYSQL_DATABASE}"
     cargo run --bin backcli -- --migrations --user-lib
 
-# Run all tests
+# Run all tests (excludes integration tests that need Docker)
 test:
-    cargo test --workspace
+    cargo test --workspace --exclude user-lib
+    cargo test --package user-lib --test bdd
 
 # Run tests with output
 test-verbose:
@@ -74,6 +75,20 @@ test-verbose:
 # Run BDD tests only
 test-bdd:
     cargo test --package user-lib --test bdd
+
+# Run integration tests (requires Docker)
+test-integration:
+    #!/usr/bin/env bash
+    set -a && source .env.local && set +a
+    # Auto-detect Docker socket: Colima > Docker Desktop > default
+    if [[ -z "$DOCKER_HOST" ]]; then
+        if [[ -S "$HOME/.colima/default/docker.sock" ]]; then
+            export DOCKER_HOST="unix://$HOME/.colima/default/docker.sock"
+        elif [[ -S "$HOME/.docker/run/docker.sock" ]]; then
+            export DOCKER_HOST="unix://$HOME/.docker/run/docker.sock"
+        fi
+    fi
+    cargo test --package user-lib --test user_service_test -- --nocapture
 
 # Build all packages
 build:
