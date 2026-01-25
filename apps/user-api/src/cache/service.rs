@@ -248,18 +248,4 @@ where
 
         Ok(())
     }
-
-    // ========== Additional Operations (pass-through without caching) ==========
-
-    pub async fn get_roles_for_user(&self, user_id: Uuid) -> Result<Vec<Role>, UserServiceError> {
-        self.inner.get_roles_for_user(user_id).await
-    }
-
-    pub async fn get_users_by_role(
-        &self,
-        role_id: Uuid,
-        pagination: PaginationParams,
-    ) -> Result<PaginatedResult<User>, UserServiceError> {
-        self.inner.get_users_by_role(role_id, pagination).await
-    }
 }

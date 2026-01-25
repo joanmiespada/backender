@@ -18,11 +18,9 @@ pub const REDIS_DB: &str = "REDIS_DB";
 
 // Cache configuration
 pub const CACHE_ENABLED: &str = "CACHE_ENABLED";
-pub const CACHE_DEFAULT_TTL_SECS: &str = "CACHE_DEFAULT_TTL_SECS";
 pub const CACHE_USER_TTL_SECS: &str = "CACHE_USER_TTL_SECS";
 pub const CACHE_ROLE_TTL_SECS: &str = "CACHE_ROLE_TTL_SECS";
 pub const CACHE_LIST_TTL_SECS: &str = "CACHE_LIST_TTL_SECS";
-pub const CACHE_POOL_SIZE: &str = "CACHE_POOL_SIZE";
 
 // Middleware configuration
 pub const RATE_LIMIT_PER_MINUTE: &str = "RATE_LIMIT_PER_MINUTE";

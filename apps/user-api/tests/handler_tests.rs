@@ -68,8 +68,6 @@ fn create_disabled_cache_config() -> CacheConfig {
         redis_host: "localhost".to_string(),
         redis_port: 6379,
         redis_db: 0,
-        pool_size: 10,
-        default_ttl: Duration::from_secs(300),
         user_ttl: Duration::from_secs(300),
         role_ttl: Duration::from_secs(600),
         list_ttl: Duration::from_secs(60),

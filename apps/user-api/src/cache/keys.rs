@@ -29,7 +29,3 @@ pub fn user_pattern() -> String {
 pub fn roles_pattern() -> String {
     format!("{}:roles:*", PREFIX)
 }
-
-pub fn role_pattern() -> String {
-    format!("{}:role:*", PREFIX)
-}
