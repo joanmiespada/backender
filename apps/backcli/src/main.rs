@@ -1,5 +1,7 @@
 // apps/backcli/src/main.rs
 
+mod keycloak_setup;
+
 use clap::{Arg, ArgAction, Command};
 use secrecy::Secret;
 use sqlx::MySqlPool;
@@ -46,6 +48,12 @@ async fn main() {
                 .action(ArgAction::SetTrue)
                 .help("Initialize root user in Keycloak and database"),
         )
+        .arg(
+            Arg::new("setup-keycloak")
+                .long("setup-keycloak")
+                .action(ArgAction::SetTrue)
+                .help("Setup Keycloak service account client and retrieve secret"),
+        )
         .get_matches();
 
     if matches.get_flag("migrations") {
@@ -78,6 +86,13 @@ async fn main() {
     if matches.get_flag("init-root") {
         if let Err(e) = init_root_user().await {
             eprintln!("Error initializing root user: {e}");
+            std::process::exit(1);
+        }
+    }
+
+    if matches.get_flag("setup-keycloak") {
+        if let Err(e) = setup_keycloak().await {
+            eprintln!("Error setting up Keycloak: {e}");
             std::process::exit(1);
         }
     }
@@ -201,6 +216,27 @@ async fn init_root_user() -> Result<(), String> {
     println!("  User ID: {}", user.id);
     println!("  Keycloak ID: {}", user.keycloak_id);
     println!("  Roles: {}", user.roles.iter().map(|r| r.name.as_str()).collect::<Vec<_>>().join(", "));
+
+    Ok(())
+}
+
+/// Setup Keycloak service account client
+async fn setup_keycloak() -> Result<(), String> {
+    println!("Setting up Keycloak service account...\n");
+
+    // Get the client ID from environment
+    let client_id = std::env::var("KEYCLOAK_CLIENT_ID")
+        .unwrap_or_else(|_| "user-api-service".to_string());
+
+    // Initialize Keycloak setup
+    let setup = keycloak_setup::KeycloakSetup::from_env()?;
+
+    // Create/retrieve the service account and get its secret
+    let secret = setup.setup_service_account(&client_id).await?;
+
+    println!("\n✓ Keycloak service account setup complete!");
+    println!("\nAdd this to your .env.local file:");
+    println!("KEYCLOAK_CLIENT_SECRET={}", secret);
 
     Ok(())
 }

@@ -63,6 +63,66 @@ migrate:
     export DATABASE_URL="mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@127.0.0.1:${MYSQL_PORT}/${MYSQL_DATABASE}"
     cargo run --bin backcli -- --migrations --user-lib
 
+# Setup Keycloak service account and update .env.local with client secret
+setup-keycloak:
+    #!/usr/bin/env bash
+    set -a && source .env.local && set +a
+
+    # Run setup and capture output
+    OUTPUT=$(cargo run --bin backcli -- --setup-keycloak 2>&1)
+
+    # Check if setup was successful
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Keycloak setup failed"
+        echo "$OUTPUT"
+        exit 1
+    fi
+
+    # Display the output
+    echo "$OUTPUT"
+
+    # Extract the secret from output
+    SECRET=$(echo "$OUTPUT" | grep "KEYCLOAK_CLIENT_SECRET=" | tail -1 | cut -d'=' -f2)
+
+    if [ -z "$SECRET" ]; then
+        echo "ERROR: Could not extract client secret from output"
+        exit 1
+    fi
+
+    # Update .env.local file
+    if grep -q "^KEYCLOAK_CLIENT_SECRET=" .env.local; then
+        # Replace existing secret
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            # macOS
+            sed -i '' "s/^KEYCLOAK_CLIENT_SECRET=.*/KEYCLOAK_CLIENT_SECRET=$SECRET/" .env.local
+        else
+            # Linux
+            sed -i "s/^KEYCLOAK_CLIENT_SECRET=.*/KEYCLOAK_CLIENT_SECRET=$SECRET/" .env.local
+        fi
+        echo ""
+        echo "✓ Updated KEYCLOAK_CLIENT_SECRET in .env.local"
+    else
+        echo "ERROR: KEYCLOAK_CLIENT_SECRET not found in .env.local"
+        exit 1
+    fi
+
+# Initialize root user in Keycloak and database
+init-root:
+    #!/usr/bin/env bash
+    set -a && source .env.local && set +a
+    export DATABASE_URL="mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@127.0.0.1:${MYSQL_PORT}/${MYSQL_DATABASE}"
+    cargo run --bin backcli -- --init-root
+
+# Complete setup: Keycloak + migrations + root user
+setup: up wait-db setup-keycloak migrate init-root
+    @echo ""
+    @echo "✓ Complete setup finished!"
+    @echo "  - Keycloak service account configured"
+    @echo "  - Database migrations applied"
+    @echo "  - Root user initialized"
+    @echo ""
+    @echo "You can now start the API with: just run"
+
 # Run all tests (excludes integration tests that need Docker)
 test:
     cargo test --workspace --exclude user-lib
