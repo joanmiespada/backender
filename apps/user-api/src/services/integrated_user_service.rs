@@ -1,3 +1,4 @@
+use secrecy::Secret;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -23,7 +24,7 @@ pub struct CreateUserRequest {
     pub email: String,
     pub first_name: Option<String>,
     pub last_name: Option<String>,
-    pub password: Option<String>,
+    pub password: Option<Secret<String>>,
 }
 
 /// Request for updating a user profile
@@ -190,17 +191,45 @@ where
     }
 
     /// Create a new user in Keycloak and local DB
+    /// Implements compensation transaction: if local DB creation fails, rolls back Keycloak user
     pub async fn create_user(&self, request: CreateUserRequest) -> Result<FullUser, IntegratedServiceError> {
         // Create in Keycloak first
         let keycloak_id = self.keycloak.create_user(
             &request.email,
             request.first_name.as_deref(),
             request.last_name.as_deref(),
-            request.password.as_deref(),
+            request.password.as_ref(),
         ).await?;
 
-        // Create local record
-        let local = self.inner.create_user(&keycloak_id).await?;
+        // Create local record with compensation on failure
+        let local = match self.inner.create_user(&keycloak_id).await {
+            Ok(user) => user,
+            Err(e) => {
+                // CRITICAL: Rollback Keycloak user creation
+                tracing::error!(
+                    keycloak_id = %keycloak_id,
+                    email = %request.email,
+                    error = ?e,
+                    "Failed to create local user record - rolling back Keycloak user"
+                );
+
+                // Attempt to delete the Keycloak user to prevent orphaned records
+                if let Err(rollback_err) = self.keycloak.delete_user(&keycloak_id).await {
+                    tracing::error!(
+                        keycloak_id = %keycloak_id,
+                        error = ?rollback_err,
+                        "CRITICAL: Failed to rollback Keycloak user - ORPHANED USER requires manual cleanup"
+                    );
+                } else {
+                    tracing::info!(
+                        keycloak_id = %keycloak_id,
+                        "Successfully rolled back Keycloak user creation"
+                    );
+                }
+
+                return Err(e.into());
+            }
+        };
 
         // Fetch the profile from Keycloak
         let kc_profile = self.get_keycloak_profile(&keycloak_id).await.ok().flatten();

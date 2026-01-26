@@ -1,3 +1,4 @@
+use secrecy::Secret;
 use serde::{Deserialize, Serialize};
 use user_lib::entities::{PaginatedResult, PaginationParams, Role};
 use uuid::Uuid;
@@ -12,8 +13,8 @@ pub struct CreateUserRequest {
     pub first_name: Option<String>,
     #[serde(default)]
     pub last_name: Option<String>,
-    #[serde(skip_serializing)]
-    pub password: Option<String>,
+    #[serde(default, skip_serializing)]
+    pub password: Option<Secret<String>>,
 }
 
 #[derive(Debug, Deserialize, Serialize, ToSchema)]

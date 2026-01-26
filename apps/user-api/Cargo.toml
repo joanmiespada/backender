@@ -34,6 +34,10 @@ redis = { version = "0.27", features = ["tokio-comp"] }
 # HTTP client for Keycloak
 reqwest = { version = "0.12", features = ["json"] }
 
+# Security - Secret handling
+secrecy = { version = "0.8", features = ["serde"] }
+zeroize = { version = "1.7", features = ["derive"] }
+
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 tower = { version = "0.5", features = ["util"] }

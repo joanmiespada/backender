@@ -1,4 +1,5 @@
 use reqwest::{Client, StatusCode};
+use secrecy::{ExposeSecret, Secret};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
@@ -11,8 +12,9 @@ use super::models::{
 };
 
 /// Token with expiration tracking
+/// Uses Secret type to protect access token in memory
 struct CachedToken {
-    access_token: String,
+    access_token: Secret<String>,
     expires_at: Instant,
 }
 
@@ -26,7 +28,7 @@ impl CachedToken {
             expires_in
         };
         Self {
-            access_token: token,
+            access_token: Secret::new(token),
             expires_at: Instant::now() + Duration::from_secs(expires_in),
         }
     }
@@ -75,7 +77,7 @@ impl KeycloakClient {
             let token_guard = self.token.read().await;
             if let Some(ref cached) = *token_guard {
                 if cached.is_valid() {
-                    return Ok(cached.access_token.clone());
+                    return Ok(cached.access_token.expose_secret().clone());
                 }
             }
         }
@@ -156,14 +158,14 @@ impl KeycloakClient {
         email: &str,
         first_name: Option<&str>,
         last_name: Option<&str>,
-        password: Option<&str>,
+        password: Option<&Secret<String>>,
     ) -> Result<String, KeycloakError> {
         let token = self.get_token().await?;
 
         let credentials = password.map(|pwd| {
             vec![KeycloakCredential {
                 credential_type: "password".to_string(),
-                value: pwd.to_string(),
+                value: pwd.expose_secret().clone(),
                 temporary: false,
             }]
         });
