@@ -19,25 +19,24 @@ impl UserRepository {
 
 #[async_trait]
 impl UserRepositoryTrait for UserRepository {
-    async fn create_user(&self, name: &str, email: &str) -> Result<UserRow, UserRepositoryError> {
+    async fn create_user(&self, keycloak_id: &str) -> Result<UserRow, UserRepositoryError> {
         let user_id = Uuid::new_v4();
 
         query(
             r#"
-            INSERT INTO users (id, name, email)
-            VALUES (?, ?, ?)
+            INSERT INTO users (id, keycloak_id)
+            VALUES (?, ?)
             "#
         )
         .bind(user_id.to_string())
-        .bind(name)
-        .bind(email)
+        .bind(keycloak_id)
         .execute(&self.pool)
         .await
         .map_err(UserRepositoryError::from)?;
 
         let user = query_as::<_, UserRow>(
             r#"
-            SELECT id, name, email FROM users WHERE id = ?
+            SELECT id, keycloak_id FROM users WHERE id = ?
             "#
         )
         .bind(user_id.to_string())
@@ -51,7 +50,7 @@ impl UserRepositoryTrait for UserRepository {
     async fn get_user(&self, user_id: Uuid) -> Result<Option<UserRow>, UserRepositoryError> {
         let user = query_as::<_, UserRow>(
             r#"
-            SELECT id, name, email FROM users WHERE id = ?
+            SELECT id, keycloak_id FROM users WHERE id = ?
             "#
         )
         .bind(user_id.to_string())
@@ -62,28 +61,14 @@ impl UserRepositoryTrait for UserRepository {
         Ok(user)
     }
 
-    async fn update_user(&self, user_id: Uuid, name: &str, email: &str) -> Result<UserRow, UserRepositoryError> {
-        query(
-            r#"
-            UPDATE users
-            SET name = ?, email = ?
-            WHERE id = ?
-            "#
-        )
-        .bind(name)
-        .bind(email)
-        .bind(user_id.to_string())
-        .execute(&self.pool)
-        .await
-        .map_err(UserRepositoryError::from)?;
-
+    async fn get_user_by_keycloak_id(&self, keycloak_id: &str) -> Result<Option<UserRow>, UserRepositoryError> {
         let user = query_as::<_, UserRow>(
             r#"
-            SELECT id, name, email FROM users WHERE id = ?
+            SELECT id, keycloak_id FROM users WHERE keycloak_id = ?
             "#
         )
-        .bind(user_id.to_string())
-        .fetch_one(&self.pool)
+        .bind(keycloak_id)
+        .fetch_optional(&self.pool)
         .await
         .map_err(UserRepositoryError::from)?;
 
@@ -112,8 +97,8 @@ impl UserRepositoryTrait for UserRepository {
 
         let users = query_as::<_, UserRow>(
             r#"
-            SELECT id, name, email FROM users
-            ORDER BY name
+            SELECT id, keycloak_id FROM users
+            ORDER BY id
             LIMIT ? OFFSET ?
             "#
         )
@@ -142,11 +127,11 @@ impl UserRepositoryTrait for UserRepository {
 
         let users = query_as::<_, UserRow>(
             r#"
-            SELECT u.id, u.name, u.email
+            SELECT u.id, u.keycloak_id
             FROM users u
             JOIN user_roles ur ON u.id = ur.user_id
             WHERE ur.role_id = ?
-            ORDER BY u.name
+            ORDER BY u.id
             LIMIT ? OFFSET ?
             "#
         )

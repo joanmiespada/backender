@@ -11,97 +11,7 @@ fn parse_uuid(s: &str) -> Result<Uuid, UserServiceError> {
     Uuid::parse_str(s).map_err(|_| UserServiceError::InvalidUuid(s.to_string()))
 }
 
-const MAX_NAME_LENGTH: usize = 255;
-const MAX_EMAIL_LENGTH: usize = 255;
 const MAX_ROLE_NAME_LENGTH: usize = 255;
-
-fn validate_name(name: &str) -> Result<(), UserServiceError> {
-    let name = name.trim();
-    if name.is_empty() {
-        return Err(UserServiceError::Validation("name cannot be empty".to_string()));
-    }
-    if name.len() > MAX_NAME_LENGTH {
-        return Err(UserServiceError::Validation(
-            format!("name cannot exceed {} characters", MAX_NAME_LENGTH)
-        ));
-    }
-    Ok(())
-}
-
-fn validate_email(email: &str) -> Result<(), UserServiceError> {
-    let email = email.trim();
-    if email.is_empty() {
-        return Err(UserServiceError::Validation("email cannot be empty".to_string()));
-    }
-    if email.len() > MAX_EMAIL_LENGTH {
-        return Err(UserServiceError::Validation(
-            format!("email cannot exceed {} characters", MAX_EMAIL_LENGTH)
-        ));
-    }
-
-    // Must contain exactly one @
-    let at_count = email.matches('@').count();
-    if at_count != 1 {
-        return Err(UserServiceError::Validation("email must contain exactly one @".to_string()));
-    }
-
-    let parts: Vec<&str> = email.split('@').collect();
-    let local = parts[0];
-    let domain = parts[1];
-
-    // Validate local part
-    if local.is_empty() || local.len() > 64 {
-        return Err(UserServiceError::Validation("email local part is invalid".to_string()));
-    }
-    if local.starts_with('.') || local.ends_with('.') {
-        return Err(UserServiceError::Validation("email local part cannot start or end with a dot".to_string()));
-    }
-    if local.contains("..") {
-        return Err(UserServiceError::Validation("email local part cannot contain consecutive dots".to_string()));
-    }
-    // Allow alphanumeric, dots, hyphens, underscores, and plus signs in local part
-    for c in local.chars() {
-        if !c.is_ascii_alphanumeric() && !".+-_".contains(c) {
-            return Err(UserServiceError::Validation(format!(
-                "email local part contains invalid character: {}", c
-            )));
-        }
-    }
-
-    // Validate domain part
-    if domain.is_empty() || domain.len() > 255 {
-        return Err(UserServiceError::Validation("email domain is invalid".to_string()));
-    }
-    if !domain.contains('.') {
-        return Err(UserServiceError::Validation("email domain must contain a dot".to_string()));
-    }
-    if domain.starts_with('.') || domain.ends_with('.') {
-        return Err(UserServiceError::Validation("email domain cannot start or end with a dot".to_string()));
-    }
-    if domain.starts_with('-') || domain.ends_with('-') {
-        return Err(UserServiceError::Validation("email domain cannot start or end with a hyphen".to_string()));
-    }
-    if domain.contains("..") {
-        return Err(UserServiceError::Validation("email domain cannot contain consecutive dots".to_string()));
-    }
-
-    // Validate TLD (at least 2 characters)
-    let tld = domain.rsplit('.').next().unwrap_or("");
-    if tld.len() < 2 {
-        return Err(UserServiceError::Validation("email domain must have a valid TLD".to_string()));
-    }
-
-    // Allow alphanumeric, dots, and hyphens in domain
-    for c in domain.chars() {
-        if !c.is_ascii_alphanumeric() && !".-".contains(c) {
-            return Err(UserServiceError::Validation(format!(
-                "email domain contains invalid character: {}", c
-            )));
-        }
-    }
-
-    Ok(())
-}
 
 fn validate_role_name(name: &str) -> Result<(), UserServiceError> {
     let name = name.trim();
@@ -134,8 +44,7 @@ fn role_from_mapping(mapping: UserRoleMapping) -> Result<(String, Role), UserSer
 fn user_from_row(row: UserRow, roles: Vec<Role>) -> Result<User, UserServiceError> {
     Ok(User {
         id: parse_uuid(&row.id)?,
-        name: row.name,
-        email: row.email,
+        keycloak_id: row.keycloak_id,
         roles,
     })
 }
@@ -208,11 +117,10 @@ where
             .collect()
     }
 
-    pub async fn create_user(&self, name: &str, email: &str) -> Result<User, UserServiceError> {
-        validate_name(name)?;
-        validate_email(email)?;
+    /// Create a local user record for a Keycloak user
+    pub async fn create_user(&self, keycloak_id: &str) -> Result<User, UserServiceError> {
         let row = self.user_repo
-            .create_user(name.trim(), email.trim())
+            .create_user(keycloak_id)
             .await
             .map_err(UserServiceError::from)?;
         user_from_row(row, vec![])
@@ -229,12 +137,16 @@ where
         }
     }
 
-    pub async fn update_user(&self, user_id: Uuid, name: &str, email: &str) -> Result<User, UserServiceError> {
-        validate_name(name)?;
-        validate_email(email)?;
-        let row = self.user_repo.update_user(user_id, name.trim(), email.trim()).await.map_err(UserServiceError::from)?;
-        let roles = self.fetch_roles_for_user(parse_uuid(&row.id)?).await?;
-        user_from_row(row, roles)
+    /// Get a user by their Keycloak ID
+    pub async fn get_user_by_keycloak_id(&self, keycloak_id: &str) -> Result<Option<User>, UserServiceError> {
+        let user_row = self.user_repo.get_user_by_keycloak_id(keycloak_id).await.map_err(UserServiceError::from)?;
+        match user_row {
+            Some(row) => {
+                let roles = self.fetch_roles_for_user(parse_uuid(&row.id)?).await?;
+                Ok(Some(user_from_row(row, roles)?))
+            }
+            None => Ok(None),
+        }
     }
 
     pub async fn delete_user(&self, user_id: Uuid) -> Result<(), UserServiceError> {

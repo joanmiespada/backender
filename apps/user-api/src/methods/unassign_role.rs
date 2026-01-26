@@ -1,6 +1,6 @@
 use axum::http::StatusCode;
 use uuid::Uuid;
-use crate::error::{ApiError, handle_service_error};
+use crate::error::{ApiError, handle_integrated_service_error};
 use crate::state::AppState;
 use crate::methods::routes::USER_ROLES_PATH;
 use crate::methods::assign_role::UserRolePath;
@@ -31,5 +31,5 @@ pub async fn unassign_role(
         .unassign_role(user_id, role_id)
         .await
         .map(|_| StatusCode::NO_CONTENT)
-        .map_err(|e| handle_service_error(e, &state.env, "unassign_role"))
+        .map_err(|e| handle_integrated_service_error(e, &state.env, "unassign_role"))
 }

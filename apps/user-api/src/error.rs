@@ -6,6 +6,9 @@ use axum::{
 use serde::Serialize;
 use user_lib::errors_service::UserServiceError;
 
+use crate::keycloak::KeycloakError;
+use crate::services::integrated_user_service::IntegratedServiceError;
+
 #[derive(Debug, Serialize)]
 pub struct ErrorResponse {
     pub error: String,
@@ -77,6 +80,29 @@ impl From<UserServiceError> for ApiError {
     }
 }
 
+impl From<KeycloakError> for ApiError {
+    fn from(err: KeycloakError) -> Self {
+        match err {
+            KeycloakError::UserNotFound(id) => ApiError::NotFound(format!("user not found in keycloak: {}", id)),
+            KeycloakError::UserAlreadyExists(email) => ApiError::Conflict(format!("user already exists: {}", email)),
+            KeycloakError::NotConfigured => ApiError::Internal("keycloak is not configured".to_string()),
+            KeycloakError::TokenError(msg) => ApiError::Internal(format!("keycloak token error: {}", msg)),
+            KeycloakError::RequestFailed(msg) => ApiError::Internal(format!("keycloak request failed: {}", msg)),
+            KeycloakError::InvalidResponse(msg) => ApiError::Internal(format!("invalid keycloak response: {}", msg)),
+            KeycloakError::Internal(msg) => ApiError::Internal(msg),
+        }
+    }
+}
+
+impl From<IntegratedServiceError> for ApiError {
+    fn from(err: IntegratedServiceError) -> Self {
+        match err {
+            IntegratedServiceError::User(e) => ApiError::from(e),
+            IntegratedServiceError::Keycloak(e) => ApiError::from(e),
+        }
+    }
+}
+
 /// Check if environment is production-like (prod, prod01, prod02, etc.)
 pub fn is_prod_like(env: &str) -> bool {
     env.to_lowercase().starts_with("prod")
@@ -88,6 +114,28 @@ pub fn handle_service_error(err: UserServiceError, env: &str, operation: &str) -
     match &err {
         UserServiceError::Internal(_) | UserServiceError::InvalidUuid(_) => {
             tracing::error!(env = %env, error = ?err, operation = %operation, "service error");
+            if is_prod_like(env) {
+                ApiError::Internal("internal server error".to_string())
+            } else {
+                ApiError::from(err)
+            }
+        }
+        _ => ApiError::from(err),
+    }
+}
+
+/// Converts an integrated service error to an ApiError, logging internal errors.
+/// In production, internal error details are hidden.
+pub fn handle_integrated_service_error(err: IntegratedServiceError, env: &str, operation: &str) -> ApiError {
+    match &err {
+        IntegratedServiceError::User(UserServiceError::Internal(_))
+        | IntegratedServiceError::User(UserServiceError::InvalidUuid(_))
+        | IntegratedServiceError::Keycloak(KeycloakError::TokenError(_))
+        | IntegratedServiceError::Keycloak(KeycloakError::RequestFailed(_))
+        | IntegratedServiceError::Keycloak(KeycloakError::InvalidResponse(_))
+        | IntegratedServiceError::Keycloak(KeycloakError::NotConfigured)
+        | IntegratedServiceError::Keycloak(KeycloakError::Internal(_)) => {
+            tracing::error!(env = %env, error = ?err, operation = %operation, "integrated service error");
             if is_prod_like(env) {
                 ApiError::Internal("internal server error".to_string())
             } else {

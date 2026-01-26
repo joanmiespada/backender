@@ -10,27 +10,16 @@ pub async fn user_created_successfully(world: &mut TestWorld) {
     world.current_user = world.user_result.as_ref().unwrap().as_ref().ok().cloned();
 }
 
-#[then(expr = "the user should have name {string}")]
-pub async fn user_has_name(world: &mut TestWorld, expected_name: String) {
+#[then(expr = "the user should have keycloak_id {string}")]
+pub async fn user_has_keycloak_id(world: &mut TestWorld, expected_keycloak_id: String) {
     let user = world.current_user.as_ref().expect("User should exist");
-    assert_eq!(user.name, expected_name);
-}
-
-#[then(expr = "the user should have email {string}")]
-pub async fn user_has_email(world: &mut TestWorld, expected_email: String) {
-    let user = world.current_user.as_ref().expect("User should exist");
-    assert_eq!(user.email, expected_email);
+    assert_eq!(user.keycloak_id, expected_keycloak_id);
 }
 
 #[then("the user should have no roles")]
 pub async fn user_has_no_roles(world: &mut TestWorld) {
     let user = world.current_user.as_ref().expect("User should exist");
     assert!(user.roles.is_empty());
-}
-
-#[then("I should receive an email already exists error")]
-pub async fn email_already_exists_error(world: &mut TestWorld) {
-    assert!(matches!(world.error, Some(UserServiceError::EmailAlreadyExists)));
 }
 
 #[then("the user should be found")]
@@ -46,12 +35,6 @@ pub async fn user_not_found(world: &mut TestWorld) {
     let result = world.optional_user_result.as_ref().expect("Result should exist");
     assert!(result.is_ok());
     assert!(result.as_ref().unwrap().is_none());
-}
-
-#[then("the update should be successful")]
-pub async fn update_successful(world: &mut TestWorld) {
-    assert!(world.user_result.as_ref().unwrap().is_ok());
-    world.current_user = world.user_result.as_ref().unwrap().as_ref().ok().cloned();
 }
 
 #[then("the deletion should be successful")]

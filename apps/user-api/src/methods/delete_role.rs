@@ -1,6 +1,6 @@
 use axum::http::StatusCode;
 use uuid::Uuid;
-use crate::error::{ApiError, handle_service_error};
+use crate::error::{ApiError, handle_integrated_service_error};
 use crate::state::AppState;
 use crate::methods::routes::ROLES_BY_ID_PATH;
 
@@ -28,5 +28,5 @@ pub async fn delete_role(
         .delete_role(parsed_id)
         .await
         .map(|_| StatusCode::NO_CONTENT)
-        .map_err(|e| handle_service_error(e, &state.env, "delete_role"))
+        .map_err(|e| handle_integrated_service_error(e, &state.env, "delete_role"))
 }

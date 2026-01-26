@@ -1,6 +1,6 @@
 use axum::Json;
 use uuid::Uuid;
-use crate::error::{ApiError, handle_service_error};
+use crate::error::{ApiError, handle_integrated_service_error};
 use crate::methods::entities::{UpdateRoleRequest, RoleResponse};
 use crate::state::AppState;
 use crate::methods::routes::ROLES_BY_ID_PATH;
@@ -32,5 +32,5 @@ pub async fn update_role(
         .update_role(parsed_id, &payload.name)
         .await
         .map(|role| Json(RoleResponse::from(role)))
-        .map_err(|e| handle_service_error(e, &state.env, "update_role"))
+        .map_err(|e| handle_integrated_service_error(e, &state.env, "update_role"))
 }

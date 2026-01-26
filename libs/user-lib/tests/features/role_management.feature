@@ -17,21 +17,21 @@ Feature: Role Management
     Then I should receive a role name already exists error
 
   Scenario: Assign a role to a user
-    Given a user exists with name "John Doe" and email "john@example.com"
+    Given a user exists with keycloak_id "kc-john-123"
     And a role exists with name "admin"
     When I assign the role to the user
     Then the assignment should be successful
     And the user should have the role "admin"
 
   Scenario: Prevent duplicate role assignment
-    Given a user exists with name "Jane Doe" and email "jane@example.com"
+    Given a user exists with keycloak_id "kc-jane-456"
     And a role exists with name "editor"
     And the user has the role "editor"
     When I try to assign the role "editor" to the user again
     Then I should receive a user already has role error
 
   Scenario: Unassign a role from a user
-    Given a user exists with name "Bob Wilson" and email "bob@example.com"
+    Given a user exists with keycloak_id "kc-bob-789"
     And a role exists with name "viewer"
     And the user has the role "viewer"
     When I unassign the role from the user
@@ -39,7 +39,7 @@ Feature: Role Management
     And the user should not have the role "viewer"
 
   Scenario: User can have multiple roles
-    Given a user exists with name "Alice Smith" and email "alice@example.com"
+    Given a user exists with keycloak_id "kc-alice-321"
     And the following roles exist:
       | name     |
       | admin    |
@@ -62,10 +62,10 @@ Feature: Role Management
   Scenario: Get users by role
     Given a role exists with name "developer"
     And the following users have the role "developer":
-      | name          | email               |
-      | Dev One       | dev1@example.com    |
-      | Dev Two       | dev2@example.com    |
-    And a user exists with name "Non Dev" and email "nondev@example.com"
+      | keycloak_id   |
+      | kc-dev1       |
+      | kc-dev2       |
+    And a user exists with keycloak_id "kc-nondev"
     When I get users with role "developer"
     Then I should receive 2 users with that role
 

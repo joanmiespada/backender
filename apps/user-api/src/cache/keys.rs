@@ -29,3 +29,11 @@ pub fn user_pattern() -> String {
 pub fn roles_pattern() -> String {
     format!("{}:roles:*", PREFIX)
 }
+
+pub fn keycloak_profile_key(keycloak_id: &str) -> String {
+    format!("{}:kc:profile:{}", PREFIX, keycloak_id)
+}
+
+pub fn keycloak_profiles_pattern() -> String {
+    format!("{}:kc:*", PREFIX)
+}

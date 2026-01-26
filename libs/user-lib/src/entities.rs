@@ -10,8 +10,7 @@ pub struct Role {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct User {
     pub id: Uuid,
-    pub name: String,
-    pub email: String,
+    pub keycloak_id: String,
     pub roles: Vec<Role>,
 }
 

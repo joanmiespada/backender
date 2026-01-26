@@ -1,5 +1,5 @@
 use axum::Json;
-use crate::error::{ApiError, handle_service_error};
+use crate::error::{ApiError, handle_integrated_service_error};
 use crate::methods::entities::{CreateRoleRequest, RoleResponse};
 use crate::state::AppState;
 use crate::methods::routes::ROLES_PATH;
@@ -24,5 +24,5 @@ pub async fn create_role(
         .create_role(&payload.name)
         .await
         .map(|role| Json(RoleResponse::from(role)))
-        .map_err(|e| handle_service_error(e, &state.env, "create_role"))
+        .map_err(|e| handle_integrated_service_error(e, &state.env, "create_role"))
 }

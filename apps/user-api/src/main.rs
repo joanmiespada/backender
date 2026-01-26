@@ -2,8 +2,10 @@ mod cache;
 mod config;
 mod constants;
 mod error;
+mod keycloak;
 mod methods;
 mod middleware;
+mod services;
 mod shutdown;
 mod state;
 
@@ -39,6 +41,7 @@ use user_lib::util::connect_with_retry;
 use crate::cache::{CacheConfig, CachedUserService, RedisCache};
 use crate::config::MiddlewareConfig;
 use crate::constants::{DATABASE_URL, ELASTIC_URL, ENV, LOCAL_ENV, SERVICE, USER_API_PORT};
+use crate::keycloak::{KeycloakClient, KeycloakConfig};
 use crate::methods::assign_role::__path_assign_role;
 use crate::methods::assign_role::assign_role;
 use crate::methods::create_role::__path_create_role;
@@ -73,6 +76,7 @@ use crate::methods::update_role::update_role;
 use crate::methods::update_user::__path_update_user;
 use crate::methods::update_user::update_user;
 use crate::middleware::ip_filter::{ip_filter_middleware, IpFilterConfig};
+use crate::services::IntegratedUserService;
 use crate::shutdown::shutdown_signal;
 use crate::state::AppState;
 
@@ -166,6 +170,22 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         tracing::warn!("Cache was enabled but Redis connection failed - running in DB-only mode");
     }
 
+    // Setup Keycloak client
+    let keycloak_config = KeycloakConfig::from_env();
+    tracing::info!(
+        keycloak_url = %keycloak_config.base_url,
+        keycloak_realm = %keycloak_config.realm,
+        keycloak_configured = keycloak_config.is_configured(),
+        profile_cache_ttl_secs = keycloak_config.profile_cache_ttl.as_secs(),
+        "keycloak configuration loaded"
+    );
+
+    let keycloak_client = Arc::new(KeycloakClient::new(keycloak_config));
+
+    if !keycloak_client.is_configured() {
+        tracing::warn!("Keycloak client secret not set - user creation/update will fail");
+    }
+
     // Create shared service
     let user_service = UserService::new(
         UserRepository::new(pool.clone()),
@@ -175,12 +195,19 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     let cached_service = CachedUserService::new(
         Arc::new(user_service),
-        redis_cache,
+        redis_cache.clone(),
         cache_config,
     );
 
+    // Create integrated service that wraps cached service + keycloak
+    let integrated_service = IntegratedUserService::new(
+        Arc::new(cached_service),
+        keycloak_client,
+        redis_cache,
+    );
+
     let app_state = AppState {
-        user_service: Arc::new(cached_service),
+        user_service: Arc::new(integrated_service),
         env: env.clone(),
     };
 

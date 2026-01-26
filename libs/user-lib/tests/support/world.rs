@@ -18,9 +18,9 @@ mock! {
 
     #[async_trait]
     impl UserRepositoryTrait for UserRepo {
-        async fn create_user(&self, name: &str, email: &str) -> Result<UserRow, UserRepositoryError>;
+        async fn create_user(&self, keycloak_id: &str) -> Result<UserRow, UserRepositoryError>;
         async fn get_user(&self, user_id: Uuid) -> Result<Option<UserRow>, UserRepositoryError>;
-        async fn update_user(&self, user_id: Uuid, name: &str, email: &str) -> Result<UserRow, UserRepositoryError>;
+        async fn get_user_by_keycloak_id(&self, keycloak_id: &str) -> Result<Option<UserRow>, UserRepositoryError>;
         async fn delete_user(&self, user_id: Uuid) -> Result<(), UserRepositoryError>;
         async fn get_users_paginated(&self, pagination: PaginationParams) -> Result<(Vec<UserRow>, u64), UserRepositoryError>;
         async fn get_users_by_role_paginated(&self, role_id: Uuid, pagination: PaginationParams) -> Result<(Vec<UserRow>, u64), UserRepositoryError>;

@@ -1,6 +1,7 @@
 use axum::Json;
-use crate::error::{ApiError, handle_service_error};
+use crate::error::{ApiError, handle_integrated_service_error};
 use crate::methods::entities::{CreateUserRequest, UserResponse};
+use crate::services::integrated_user_service::CreateUserRequest as ServiceCreateUserRequest;
 use crate::state::AppState;
 use crate::methods::routes::USERS_PATH;
 
@@ -20,10 +21,16 @@ pub async fn create_user(
     axum::extract::State(state): axum::extract::State<AppState>,
     Json(payload): Json<CreateUserRequest>,
 ) -> Result<Json<UserResponse>, ApiError> {
+    let request = ServiceCreateUserRequest {
+        email: payload.email,
+        first_name: payload.first_name,
+        last_name: payload.last_name,
+        password: payload.password,
+    };
+
     state.user_service
-        .create_user(&payload.name, &payload.email)
+        .create_user(request)
         .await
         .map(|user| Json(UserResponse::from(user)))
-        .map_err(|e| handle_service_error(e, &state.env, "create_user"))
+        .map_err(|e| handle_integrated_service_error(e, &state.env, "create_user"))
 }
-

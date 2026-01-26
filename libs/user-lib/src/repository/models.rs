@@ -3,8 +3,7 @@ use sqlx::FromRow;
 #[derive(Debug, Clone, FromRow)]
 pub struct UserRow {
     pub id: String,
-    pub name: String,
-    pub email: String,
+    pub keycloak_id: String,
 }
 
 #[derive(Debug, Clone, FromRow)]

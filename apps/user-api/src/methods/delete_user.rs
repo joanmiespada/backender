@@ -1,6 +1,6 @@
 use axum::http::StatusCode;
 use uuid::Uuid;
-use crate::error::{ApiError, handle_service_error};
+use crate::error::{ApiError, handle_integrated_service_error};
 use crate::state::AppState;
 use crate::methods::routes::USERS_BY_ID_PATH;
 
@@ -28,5 +28,5 @@ pub async fn delete_user(
         .delete_user(parsed_id)
         .await
         .map(|_| StatusCode::NO_CONTENT)
-        .map_err(|e| handle_service_error(e, &state.env, "delete_user"))
+        .map_err(|e| handle_integrated_service_error(e, &state.env, "delete_user"))
 }

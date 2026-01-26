@@ -36,6 +36,14 @@ where
         }
     }
 
+    pub fn cache(&self) -> &RedisCache {
+        &self.cache
+    }
+
+    pub fn config(&self) -> &CacheConfig {
+        &self.config
+    }
+
     // ========== User Read Operations ==========
 
     pub async fn get_user(&self, user_id: Uuid) -> Result<Option<User>, UserServiceError> {
@@ -59,6 +67,11 @@ where
         }
 
         Ok(result)
+    }
+
+    pub async fn get_user_by_keycloak_id(&self, keycloak_id: &str) -> Result<Option<User>, UserServiceError> {
+        // No caching for keycloak_id lookups - they're used for syncing
+        self.inner.get_user_by_keycloak_id(keycloak_id).await
     }
 
     pub async fn get_users(
@@ -87,28 +100,11 @@ where
 
     // ========== User Write Operations ==========
 
-    pub async fn create_user(&self, name: &str, email: &str) -> Result<User, UserServiceError> {
-        let user = self.inner.create_user(name, email).await?;
+    pub async fn create_user(&self, keycloak_id: &str) -> Result<User, UserServiceError> {
+        let user = self.inner.create_user(keycloak_id).await?;
 
         // Invalidate users list cache
         if self.cache.is_enabled() {
-            self.cache.delete_pattern(&keys::users_pattern()).await;
-        }
-
-        Ok(user)
-    }
-
-    pub async fn update_user(
-        &self,
-        user_id: Uuid,
-        name: &str,
-        email: &str,
-    ) -> Result<User, UserServiceError> {
-        let user = self.inner.update_user(user_id, name, email).await?;
-
-        // Invalidate specific user and users list cache
-        if self.cache.is_enabled() {
-            self.cache.delete(&keys::user_key(user_id)).await;
             self.cache.delete_pattern(&keys::users_pattern()).await;
         }
 

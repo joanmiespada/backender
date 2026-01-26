@@ -1,35 +1,51 @@
 use serde::{Deserialize, Serialize};
-use user_lib::entities::{User, Role, PaginatedResult, PaginationParams};
+use user_lib::entities::{PaginatedResult, PaginationParams, Role};
 use uuid::Uuid;
 use utoipa::{ToSchema, IntoParams};
 
+use crate::keycloak::FullUser;
+
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct CreateUserRequest {
-    pub name: String,
     pub email: String,
+    #[serde(default)]
+    pub first_name: Option<String>,
+    #[serde(default)]
+    pub last_name: Option<String>,
+    #[serde(skip_serializing)]
+    pub password: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct UpdateUserRequest {
-    pub name: String,
-    pub email: String,
+    #[serde(default)]
+    pub first_name: Option<String>,
+    #[serde(default)]
+    pub last_name: Option<String>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct UserResponse {
     pub id: Uuid,
+    pub keycloak_id: String,
     pub name: String,
-    pub email: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub email: Option<String>,
     pub roles: Vec<RoleResponse>,
+    pub email_verified: bool,
+    pub enabled: bool,
 }
 
-impl From<User> for UserResponse {
-    fn from(user: User) -> Self {
+impl From<FullUser> for UserResponse {
+    fn from(user: FullUser) -> Self {
         UserResponse {
             id: user.id,
+            keycloak_id: user.keycloak_id,
             name: user.name,
             email: user.email,
             roles: user.roles.into_iter().map(RoleResponse::from).collect(),
+            email_verified: user.email_verified,
+            enabled: user.enabled,
         }
     }
 }
@@ -94,4 +110,3 @@ where
         }
     }
 }
-

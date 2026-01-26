@@ -11,20 +11,18 @@ pub async fn clean_database(world: &mut TestWorld) {
     *world = TestWorld::default();
 }
 
-#[given(expr = "a user exists with name {string} and email {string}")]
-pub async fn user_exists(world: &mut TestWorld, name: String, email: String) {
+#[given(expr = "a user exists with keycloak_id {string}")]
+pub async fn user_exists(world: &mut TestWorld, keycloak_id: String) {
     let user_id = Uuid::new_v4();
     world.current_user_id = Some(user_id);
     world.current_user = Some(User {
         id: user_id,
-        name: name.clone(),
-        email: email.clone(),
+        keycloak_id: keycloak_id.clone(),
         roles: vec![],
     });
     world.stored_users.push(UserRow {
         id: user_id.to_string(),
-        name,
-        email,
+        keycloak_id,
     });
 }
 
@@ -56,12 +54,10 @@ pub async fn user_has_role(world: &mut TestWorld, role_name: String) {
 pub async fn users_exist(world: &mut TestWorld, step: &cucumber::gherkin::Step) {
     if let Some(table) = &step.table {
         for row in table.rows.iter().skip(1) {
-            let name = row.get(0).map(|s| s.as_str()).unwrap_or("");
-            let email = row.get(1).map(|s| s.as_str()).unwrap_or("");
+            let keycloak_id = row.get(0).map(|s| s.as_str()).unwrap_or("");
             world.stored_users.push(UserRow {
                 id: Uuid::new_v4().to_string(),
-                name: name.to_string(),
-                email: email.to_string(),
+                keycloak_id: keycloak_id.to_string(),
             });
         }
     }
@@ -91,12 +87,10 @@ pub async fn users_have_role(world: &mut TestWorld, _role_name: String, step: &c
 
     if let Some(table) = &step.table {
         for row in table.rows.iter().skip(1) {
-            let name = row.get(0).map(|s| s.as_str()).unwrap_or("");
-            let email = row.get(1).map(|s| s.as_str()).unwrap_or("");
+            let keycloak_id = row.get(0).map(|s| s.as_str()).unwrap_or("");
             let user_row = UserRow {
                 id: Uuid::new_v4().to_string(),
-                name: name.to_string(),
-                email: email.to_string(),
+                keycloak_id: keycloak_id.to_string(),
             };
             world.stored_users.push(user_row.clone());
             world.users_with_current_role.push(user_row);

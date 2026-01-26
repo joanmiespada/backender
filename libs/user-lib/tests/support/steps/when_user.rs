@@ -2,28 +2,24 @@ use cucumber::when;
 use uuid::Uuid;
 
 use user_lib::entities::PaginationParams;
-use user_lib::repository::errors::UserRepositoryError;
 use user_lib::repository::models::UserRow;
 
 use crate::support::world::TestWorld;
 
-#[when(expr = "I create a user with name {string} and email {string}")]
-pub async fn create_user(world: &mut TestWorld, name: String, email: String) {
+#[when(expr = "I create a user with keycloak_id {string}")]
+pub async fn create_user(world: &mut TestWorld, keycloak_id: String) {
     let user_id = Uuid::new_v4();
-    let name_clone = name.clone();
-    let email_clone = email.clone();
+    let kc_id_clone = keycloak_id.clone();
 
     let service = world.create_service_with_mocks(
         move |user_repo| {
-            let n = name_clone.clone();
-            let e = email_clone.clone();
+            let kc = kc_id_clone.clone();
             user_repo
                 .expect_create_user()
-                .returning(move |_, _| {
+                .returning(move |_| {
                     Ok(UserRow {
                         id: user_id.to_string(),
-                        name: n.clone(),
-                        email: e.clone(),
+                        keycloak_id: kc.clone(),
                     })
                 });
         },
@@ -31,25 +27,7 @@ pub async fn create_user(world: &mut TestWorld, name: String, email: String) {
         |_| {},
     );
 
-    world.user_result = Some(service.create_user(&name, &email).await);
-}
-
-#[when(expr = "I try to create a user with name {string} and email {string}")]
-pub async fn try_create_user(world: &mut TestWorld, name: String, email: String) {
-    let service = world.create_service_with_mocks(
-        |user_repo| {
-            user_repo
-                .expect_create_user()
-                .returning(|_, _| Err(UserRepositoryError::EmailAlreadyExists));
-        },
-        |_| {},
-        |_| {},
-    );
-
-    let result = service.create_user(&name, &email).await;
-    if let Err(e) = result {
-        world.error = Some(e);
-    }
+    world.user_result = Some(service.create_user(&keycloak_id).await);
 }
 
 #[when("I retrieve the user by their ID")]
@@ -65,8 +43,7 @@ pub async fn retrieve_user_by_id(world: &mut TestWorld) {
                 .returning(move |_| {
                     Ok(Some(UserRow {
                         id: u.id.to_string(),
-                        name: u.name.clone(),
-                        email: u.email.clone(),
+                        keycloak_id: u.keycloak_id.clone(),
                     }))
                 });
         },
@@ -96,37 +73,6 @@ pub async fn retrieve_random_user(world: &mut TestWorld) {
     );
 
     world.optional_user_result = Some(service.get_user(random_id).await);
-}
-
-#[when(expr = "I update the user's name to {string} and email to {string}")]
-pub async fn update_user(world: &mut TestWorld, new_name: String, new_email: String) {
-    let user_id = world.current_user_id.expect("User ID should be set");
-    let name_clone = new_name.clone();
-    let email_clone = new_email.clone();
-
-    let service = world.create_service_with_mocks(
-        move |user_repo| {
-            let n = name_clone.clone();
-            let e = email_clone.clone();
-            user_repo
-                .expect_update_user()
-                .returning(move |id, _, _| {
-                    Ok(UserRow {
-                        id: id.to_string(),
-                        name: n.clone(),
-                        email: e.clone(),
-                    })
-                });
-        },
-        |role_repo| {
-            role_repo
-                .expect_get_roles_for_user()
-                .returning(|_| Ok(vec![]));
-        },
-        |_| {},
-    );
-
-    world.user_result = Some(service.update_user(user_id, &new_name, &new_email).await);
 }
 
 #[when("I delete the user")]

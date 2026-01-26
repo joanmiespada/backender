@@ -11,15 +11,11 @@ static MIGRATOR: Migrator = sqlx::migrate!();
 #[tokio::test]
 async fn integration_user_service_flow() {
      let image = GenericImage::new("mysql", "8")
-        //.with_exposed_port(3306.tcp())
         .with_wait_for(WaitFor::message_on_stderr("ready for connections"))
         .with_env_var("MYSQL_ROOT_PASSWORD", "password")
         .with_env_var("MYSQL_DATABASE", "testdb")
         .with_env_var("MYSQL_USER", "testuser")
         .with_env_var("MYSQL_PASSWORD", "testpass")
-        //.start()
-        //.await
-        //.expect("Failed to start MySQL container");
         .with_mapped_port(3306, 3306.tcp());
 
     let container = image.start().await.expect("Failed to start MySQL container");
@@ -30,7 +26,7 @@ async fn integration_user_service_flow() {
 
     let db_url = format!("mysql://testuser:testpass@localhost:{}/testdb", port);
 
-    let pool = connect_with_retry(&db_url, 10).await;
+    let pool = connect_with_retry(&db_url, 10).await.expect("Failed to connect to database");
     MIGRATOR.run(&pool).await.unwrap();
 
     let user_repo = UserRepository::new(pool.clone());
@@ -46,12 +42,12 @@ async fn integration_user_service_flow() {
 
     let seeded_users = user_service.get_users(PaginationParams::default()).await.unwrap();
     assert_eq!(seeded_users.items.len(), 1, "Should have seeded root user");
-    assert!(seeded_users.items.iter().any(|u| u.name == "root"), "Should have root user");
+    assert!(seeded_users.items.iter().any(|u| u.keycloak_id == "root-placeholder-keycloak-id"), "Should have root user with placeholder keycloak_id");
 
-    // Create additional users
-    let user1 = user_service.create_user("Alice", "alice@example.com").await.unwrap();
-    let user2 = user_service.create_user("Bob", "bob@example.com").await.unwrap();
-    let user3 = user_service.create_user("Charlie", "charlie@example.com").await.unwrap();
+    // Create additional users (with keycloak_id only - profile data is in Keycloak)
+    let user1 = user_service.create_user("kc-alice-12345").await.unwrap();
+    let user2 = user_service.create_user("kc-bob-67890").await.unwrap();
+    let user3 = user_service.create_user("kc-charlie-11111").await.unwrap();
 
     // Create additional roles (different names from seeded ones)
     let role_editor = user_service.create_role("editor").await.unwrap();

@@ -1,10 +1,14 @@
--- Create users table
+-- Create users table (Keycloak-integrated schema)
+-- User profile data (name, email) is stored in Keycloak
+-- Local DB only stores user ID and Keycloak reference
 CREATE TABLE users (
     id CHAR(36) PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) NOT NULL,
-    CONSTRAINT `user_email_unique` UNIQUE (email)
+    keycloak_id VARCHAR(255) NOT NULL,
+    CONSTRAINT `user_keycloak_id_unique` UNIQUE (keycloak_id)
 );
+
+-- Create index for fast Keycloak ID lookups
+CREATE INDEX idx_users_keycloak_id ON users(keycloak_id);
 
 -- Create roles table
 CREATE TABLE roles (
@@ -26,10 +30,3 @@ CREATE TABLE user_roles (
 INSERT INTO roles (id, name) VALUES
     ('00000000-0000-0000-0000-000000000001', 'admin'),
     ('00000000-0000-0000-0000-000000000002', 'user');
-
--- Seed root user with admin role
-INSERT INTO users (id, name, email) VALUES
-    ('00000000-0000-0000-0000-000000000001', 'root', 'root@localhost');
-
-INSERT INTO user_roles (user_id, role_id) VALUES
-    ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001');

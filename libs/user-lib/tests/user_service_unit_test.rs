@@ -15,9 +15,9 @@ mock! {
 
     #[async_trait]
     impl UserRepositoryTrait for UserRepo {
-        async fn create_user(&self, name: &str, email: &str) -> Result<UserRow, UserRepositoryError>;
+        async fn create_user(&self, keycloak_id: &str) -> Result<UserRow, UserRepositoryError>;
         async fn get_user(&self, user_id: Uuid) -> Result<Option<UserRow>, UserRepositoryError>;
-        async fn update_user(&self, user_id: Uuid, name: &str, email: &str) -> Result<UserRow, UserRepositoryError>;
+        async fn get_user_by_keycloak_id(&self, keycloak_id: &str) -> Result<Option<UserRow>, UserRepositoryError>;
         async fn delete_user(&self, user_id: Uuid) -> Result<(), UserRepositoryError>;
         async fn get_users_paginated(&self, pagination: PaginationParams) -> Result<(Vec<UserRow>, u64), UserRepositoryError>;
         async fn get_users_by_role_paginated(&self, role_id: Uuid, pagination: PaginationParams) -> Result<(Vec<UserRow>, u64), UserRepositoryError>;
@@ -70,46 +70,27 @@ async fn test_create_user_success() {
     let user_role_repo = MockUserRoleRepo::new();
 
     let user_id = Uuid::new_v4();
+    let keycloak_id = "kc-user-12345";
 
     user_repo
         .expect_create_user()
-        .withf(|name, email| name == "John Doe" && email == "john@example.com")
+        .withf(|kc_id| kc_id == "kc-user-12345")
         .times(1)
-        .returning(move |_, _| {
+        .returning(move |kc_id| {
             Ok(UserRow {
                 id: user_id.to_string(),
-                name: "John Doe".to_string(),
-                email: "john@example.com".to_string(),
+                keycloak_id: kc_id.to_string(),
             })
         });
 
     let service = create_test_service(user_repo, role_repo, user_role_repo);
-    let result = service.create_user("John Doe", "john@example.com").await;
+    let result = service.create_user(keycloak_id).await;
 
     assert!(result.is_ok());
     let user = result.unwrap();
     assert_eq!(user.id, user_id);
-    assert_eq!(user.name, "John Doe");
-    assert_eq!(user.email, "john@example.com");
+    assert_eq!(user.keycloak_id, keycloak_id);
     assert!(user.roles.is_empty());
-}
-
-#[tokio::test]
-async fn test_create_user_email_already_exists() {
-    let mut user_repo = MockUserRepo::new();
-    let role_repo = MockRoleRepo::new();
-    let user_role_repo = MockUserRoleRepo::new();
-
-    user_repo
-        .expect_create_user()
-        .times(1)
-        .returning(|_, _| Err(UserRepositoryError::EmailAlreadyExists));
-
-    let service = create_test_service(user_repo, role_repo, user_role_repo);
-    let result = service.create_user("John Doe", "existing@example.com").await;
-
-    assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), UserServiceError::EmailAlreadyExists));
 }
 
 // ==================== GET USER TESTS ====================
@@ -122,6 +103,7 @@ async fn test_get_user_success() {
 
     let user_id = Uuid::new_v4();
     let role_id = Uuid::new_v4();
+    let keycloak_id = "kc-user-jane";
 
     user_repo
         .expect_get_user()
@@ -130,8 +112,7 @@ async fn test_get_user_success() {
         .returning(move |_| {
             Ok(Some(UserRow {
                 id: user_id.to_string(),
-                name: "Jane Doe".to_string(),
-                email: "jane@example.com".to_string(),
+                keycloak_id: keycloak_id.to_string(),
             }))
         });
 
@@ -151,8 +132,7 @@ async fn test_get_user_success() {
     assert!(result.is_ok());
     let user = result.unwrap().unwrap();
     assert_eq!(user.id, user_id);
-    assert_eq!(user.name, "Jane Doe");
-    assert_eq!(user.email, "jane@example.com");
+    assert_eq!(user.keycloak_id, keycloak_id);
     assert_eq!(user.roles.len(), 1);
     assert_eq!(user.roles[0].name, "admin");
 }
@@ -177,28 +157,24 @@ async fn test_get_user_not_found() {
     assert!(result.unwrap().is_none());
 }
 
-// ==================== UPDATE USER TESTS ====================
-
 #[tokio::test]
-async fn test_update_user_success() {
+async fn test_get_user_by_keycloak_id_success() {
     let mut user_repo = MockUserRepo::new();
     let mut role_repo = MockRoleRepo::new();
     let user_role_repo = MockUserRoleRepo::new();
 
     let user_id = Uuid::new_v4();
+    let keycloak_id = "kc-user-lookup";
 
     user_repo
-        .expect_update_user()
-        .withf(move |id, name, email| {
-            *id == user_id && name == "Updated Name" && email == "updated@example.com"
-        })
+        .expect_get_user_by_keycloak_id()
+        .withf(|kc_id| kc_id == "kc-user-lookup")
         .times(1)
-        .returning(move |_, _, _| {
-            Ok(UserRow {
+        .returning(move |kc_id| {
+            Ok(Some(UserRow {
                 id: user_id.to_string(),
-                name: "Updated Name".to_string(),
-                email: "updated@example.com".to_string(),
-            })
+                keycloak_id: kc_id.to_string(),
+            }))
         });
 
     role_repo
@@ -207,32 +183,11 @@ async fn test_update_user_success() {
         .returning(|_| Ok(vec![]));
 
     let service = create_test_service(user_repo, role_repo, user_role_repo);
-    let result = service.update_user(user_id, "Updated Name", "updated@example.com").await;
+    let result = service.get_user_by_keycloak_id(keycloak_id).await;
 
     assert!(result.is_ok());
-    let user = result.unwrap();
-    assert_eq!(user.name, "Updated Name");
-    assert_eq!(user.email, "updated@example.com");
-}
-
-#[tokio::test]
-async fn test_update_user_email_conflict() {
-    let mut user_repo = MockUserRepo::new();
-    let role_repo = MockRoleRepo::new();
-    let user_role_repo = MockUserRoleRepo::new();
-
-    let user_id = Uuid::new_v4();
-
-    user_repo
-        .expect_update_user()
-        .times(1)
-        .returning(|_, _, _| Err(UserRepositoryError::EmailAlreadyExists));
-
-    let service = create_test_service(user_repo, role_repo, user_role_repo);
-    let result = service.update_user(user_id, "Name", "taken@example.com").await;
-
-    assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), UserServiceError::EmailAlreadyExists));
+    let user = result.unwrap().unwrap();
+    assert_eq!(user.keycloak_id, keycloak_id);
 }
 
 // ==================== DELETE USER TESTS ====================
@@ -493,13 +448,11 @@ async fn test_get_users_success() {
             Ok((vec![
                 UserRow {
                     id: user1_id.to_string(),
-                    name: "User One".to_string(),
-                    email: "user1@example.com".to_string(),
+                    keycloak_id: "kc-user-1".to_string(),
                 },
                 UserRow {
                     id: user2_id.to_string(),
-                    name: "User Two".to_string(),
-                    email: "user2@example.com".to_string(),
+                    keycloak_id: "kc-user-2".to_string(),
                 },
             ], 2))
         });
@@ -523,10 +476,10 @@ async fn test_get_users_success() {
     assert_eq!(paginated.items.len(), 2);
     assert_eq!(paginated.total, 2);
     assert_eq!(paginated.page, 1);
-    assert_eq!(paginated.items[0].name, "User One");
+    assert_eq!(paginated.items[0].keycloak_id, "kc-user-1");
     assert_eq!(paginated.items[0].roles.len(), 1);
     assert_eq!(paginated.items[0].roles[0].name, "admin");
-    assert_eq!(paginated.items[1].name, "User Two");
+    assert_eq!(paginated.items[1].keycloak_id, "kc-user-2");
     assert_eq!(paginated.items[1].roles.len(), 0);
 }
 
@@ -637,8 +590,7 @@ async fn test_get_users_by_role_success() {
         .returning(move |_, _| {
             Ok((vec![UserRow {
                 id: user_id.to_string(),
-                name: "Admin User".to_string(),
-                email: "admin@example.com".to_string(),
+                keycloak_id: "kc-admin-user".to_string(),
             }], 1))
         });
 
@@ -660,103 +612,11 @@ async fn test_get_users_by_role_success() {
     let paginated = result.unwrap();
     assert_eq!(paginated.items.len(), 1);
     assert_eq!(paginated.total, 1);
-    assert_eq!(paginated.items[0].name, "Admin User");
+    assert_eq!(paginated.items[0].keycloak_id, "kc-admin-user");
     assert_eq!(paginated.items[0].roles.len(), 1);
 }
 
 // ==================== VALIDATION TESTS ====================
-
-#[tokio::test]
-async fn test_create_user_empty_name() {
-    let user_repo = MockUserRepo::new();
-    let role_repo = MockRoleRepo::new();
-    let user_role_repo = MockUserRoleRepo::new();
-
-    let service = create_test_service(user_repo, role_repo, user_role_repo);
-    let result = service.create_user("", "test@example.com").await;
-
-    assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), UserServiceError::Validation(_)));
-}
-
-#[tokio::test]
-async fn test_create_user_whitespace_name() {
-    let user_repo = MockUserRepo::new();
-    let role_repo = MockRoleRepo::new();
-    let user_role_repo = MockUserRoleRepo::new();
-
-    let service = create_test_service(user_repo, role_repo, user_role_repo);
-    let result = service.create_user("   ", "test@example.com").await;
-
-    assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), UserServiceError::Validation(_)));
-}
-
-#[tokio::test]
-async fn test_create_user_empty_email() {
-    let user_repo = MockUserRepo::new();
-    let role_repo = MockRoleRepo::new();
-    let user_role_repo = MockUserRoleRepo::new();
-
-    let service = create_test_service(user_repo, role_repo, user_role_repo);
-    let result = service.create_user("John Doe", "").await;
-
-    assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), UserServiceError::Validation(_)));
-}
-
-#[tokio::test]
-async fn test_create_user_invalid_email_no_at() {
-    let user_repo = MockUserRepo::new();
-    let role_repo = MockRoleRepo::new();
-    let user_role_repo = MockUserRoleRepo::new();
-
-    let service = create_test_service(user_repo, role_repo, user_role_repo);
-    let result = service.create_user("John Doe", "invalid-email").await;
-
-    assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), UserServiceError::Validation(_)));
-}
-
-#[tokio::test]
-async fn test_create_user_invalid_email_no_domain_dot() {
-    let user_repo = MockUserRepo::new();
-    let role_repo = MockRoleRepo::new();
-    let user_role_repo = MockUserRoleRepo::new();
-
-    let service = create_test_service(user_repo, role_repo, user_role_repo);
-    let result = service.create_user("John Doe", "test@localhost").await;
-
-    assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), UserServiceError::Validation(_)));
-}
-
-#[tokio::test]
-async fn test_create_user_invalid_email_multiple_at() {
-    let user_repo = MockUserRepo::new();
-    let role_repo = MockRoleRepo::new();
-    let user_role_repo = MockUserRoleRepo::new();
-
-    let service = create_test_service(user_repo, role_repo, user_role_repo);
-    let result = service.create_user("John Doe", "test@@example.com").await;
-
-    assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), UserServiceError::Validation(_)));
-}
-
-#[tokio::test]
-async fn test_create_user_name_too_long() {
-    let user_repo = MockUserRepo::new();
-    let role_repo = MockRoleRepo::new();
-    let user_role_repo = MockUserRoleRepo::new();
-
-    let long_name = "a".repeat(256);
-    let service = create_test_service(user_repo, role_repo, user_role_repo);
-    let result = service.create_user(&long_name, "test@example.com").await;
-
-    assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), UserServiceError::Validation(_)));
-}
 
 #[tokio::test]
 async fn test_create_role_empty_name() {
@@ -766,20 +626,6 @@ async fn test_create_role_empty_name() {
 
     let service = create_test_service(user_repo, role_repo, user_role_repo);
     let result = service.create_role("").await;
-
-    assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), UserServiceError::Validation(_)));
-}
-
-#[tokio::test]
-async fn test_update_user_invalid_email() {
-    let user_repo = MockUserRepo::new();
-    let role_repo = MockRoleRepo::new();
-    let user_role_repo = MockUserRoleRepo::new();
-
-    let user_id = Uuid::new_v4();
-    let service = create_test_service(user_repo, role_repo, user_role_repo);
-    let result = service.update_user(user_id, "John", "not-an-email").await;
 
     assert!(result.is_err());
     assert!(matches!(result.unwrap_err(), UserServiceError::Validation(_)));

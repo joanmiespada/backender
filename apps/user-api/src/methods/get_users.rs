@@ -1,5 +1,5 @@
 use axum::{extract::Query, Json};
-use crate::error::{ApiError, handle_service_error};
+use crate::error::{ApiError, handle_integrated_service_error};
 use crate::methods::entities::{PaginatedResponse, PaginationQuery, UserResponse};
 use crate::state::AppState;
 use crate::methods::routes::USERS_PATH;
@@ -22,5 +22,5 @@ pub async fn get_users(
         .get_users(pagination.into())
         .await
         .map(|result| Json(PaginatedResponse::from(result)))
-        .map_err(|e| handle_service_error(e, &state.env, "get_users"))
+        .map_err(|e| handle_integrated_service_error(e, &state.env, "get_users"))
 }

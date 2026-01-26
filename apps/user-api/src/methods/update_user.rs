@@ -1,7 +1,8 @@
 use axum::Json;
 use uuid::Uuid;
-use crate::error::{ApiError, handle_service_error};
+use crate::error::{ApiError, handle_integrated_service_error};
 use crate::methods::entities::{UpdateUserRequest, UserResponse};
+use crate::services::integrated_user_service::UpdateUserRequest as ServiceUpdateUserRequest;
 use crate::state::AppState;
 use crate::methods::routes::USERS_BY_ID_PATH;
 
@@ -17,7 +18,6 @@ use crate::methods::routes::USERS_BY_ID_PATH;
         (status = 200, description = "User updated successfully", body = UserResponse),
         (status = 400, description = "Invalid UUID or validation error"),
         (status = 404, description = "User not found"),
-        (status = 409, description = "Email already exists"),
         (status = 500, description = "Internal server error"),
     )
 )]
@@ -28,9 +28,14 @@ pub async fn update_user(
 ) -> Result<Json<UserResponse>, ApiError> {
     let parsed_id = Uuid::parse_str(&id).map_err(|_| ApiError::invalid_uuid())?;
 
+    let request = ServiceUpdateUserRequest {
+        first_name: payload.first_name,
+        last_name: payload.last_name,
+    };
+
     state.user_service
-        .update_user(parsed_id, &payload.name, &payload.email)
+        .update_user(parsed_id, request)
         .await
         .map(|user| Json(UserResponse::from(user)))
-        .map_err(|e| handle_service_error(e, &state.env, "update_user"))
+        .map_err(|e| handle_integrated_service_error(e, &state.env, "update_user"))
 }
