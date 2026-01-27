@@ -774,3 +774,167 @@ async fn test_role_entity_structure() {
     assert_eq!(role.id, role_id);
     assert_eq!(role.name, "editor");
 }
+
+// ==================== INPUT VALIDATION TESTS ====================
+
+#[tokio::test]
+async fn test_create_user_request_valid_email() {
+    use user_api::methods::entities::CreateUserRequest;
+    use validator::Validate;
+
+    let request = CreateUserRequest {
+        email: "valid@example.com".to_string(),
+        first_name: Some("John".to_string()),
+        last_name: Some("Doe".to_string()),
+        password: None,
+    };
+
+    let result = request.validate();
+    assert!(result.is_ok(), "Valid email should pass validation");
+}
+
+#[tokio::test]
+async fn test_create_user_request_invalid_email() {
+    use user_api::methods::entities::CreateUserRequest;
+    use validator::Validate;
+
+    let request = CreateUserRequest {
+        email: "not-an-email".to_string(),
+        first_name: None,
+        last_name: None,
+        password: None,
+    };
+
+    let result = request.validate();
+    assert!(result.is_err(), "Invalid email should fail validation");
+
+    let errors = result.unwrap_err();
+    assert!(
+        errors.field_errors().contains_key("email"),
+        "Should have email validation error"
+    );
+}
+
+#[tokio::test]
+async fn test_create_user_request_email_too_long() {
+    use user_api::methods::entities::CreateUserRequest;
+    use validator::Validate;
+
+    // Create an email longer than 254 characters
+    let long_local = "a".repeat(250);
+    let long_email = format!("{}@example.com", long_local);
+
+    let request = CreateUserRequest {
+        email: long_email,
+        first_name: None,
+        last_name: None,
+        password: None,
+    };
+
+    let result = request.validate();
+    assert!(
+        result.is_err(),
+        "Email longer than 254 chars should fail validation"
+    );
+}
+
+#[tokio::test]
+async fn test_create_user_request_name_too_long() {
+    use user_api::methods::entities::CreateUserRequest;
+    use validator::Validate;
+
+    let long_name = "a".repeat(101);
+
+    let request = CreateUserRequest {
+        email: "valid@example.com".to_string(),
+        first_name: Some(long_name),
+        last_name: None,
+        password: None,
+    };
+
+    let result = request.validate();
+    assert!(
+        result.is_err(),
+        "Name longer than 100 chars should fail validation"
+    );
+
+    let errors = result.unwrap_err();
+    assert!(
+        errors.field_errors().contains_key("first_name"),
+        "Should have first_name validation error"
+    );
+}
+
+#[tokio::test]
+async fn test_create_role_request_valid() {
+    use user_api::methods::entities::CreateRoleRequest;
+    use validator::Validate;
+
+    let request = CreateRoleRequest {
+        name: "admin".to_string(),
+    };
+
+    let result = request.validate();
+    assert!(result.is_ok(), "Valid role name should pass validation");
+}
+
+#[tokio::test]
+async fn test_create_role_request_empty_name() {
+    use user_api::methods::entities::CreateRoleRequest;
+    use validator::Validate;
+
+    let request = CreateRoleRequest {
+        name: "".to_string(),
+    };
+
+    let result = request.validate();
+    assert!(result.is_err(), "Empty role name should fail validation");
+}
+
+#[tokio::test]
+async fn test_create_role_request_name_too_long() {
+    use user_api::methods::entities::CreateRoleRequest;
+    use validator::Validate;
+
+    let long_name = "a".repeat(51);
+
+    let request = CreateRoleRequest { name: long_name };
+
+    let result = request.validate();
+    assert!(
+        result.is_err(),
+        "Role name longer than 50 chars should fail validation"
+    );
+
+    let errors = result.unwrap_err();
+    assert!(
+        errors.field_errors().contains_key("name"),
+        "Should have name validation error"
+    );
+}
+
+#[tokio::test]
+async fn test_validation_error_to_api_error() {
+    use user_api::error::ApiError;
+    use user_api::methods::entities::CreateUserRequest;
+    use validator::Validate;
+
+    let request = CreateUserRequest {
+        email: "not-valid".to_string(),
+        first_name: None,
+        last_name: None,
+        password: None,
+    };
+
+    let validation_result = request.validate();
+    assert!(validation_result.is_err());
+
+    let api_error: ApiError = validation_result.unwrap_err().into();
+    let response = api_error.into_response();
+
+    assert_eq!(
+        response.status(),
+        StatusCode::BAD_REQUEST,
+        "Validation errors should return 400 Bad Request"
+    );
+}

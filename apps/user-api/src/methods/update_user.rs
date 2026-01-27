@@ -5,6 +5,7 @@ use crate::services::integrated_user_service::UpdateUserRequest as ServiceUpdate
 use crate::state::AppState;
 use axum::Json;
 use uuid::Uuid;
+use validator::Validate;
 
 #[utoipa::path(
     put,
@@ -26,6 +27,9 @@ pub async fn update_user(
     axum::extract::State(state): axum::extract::State<AppState>,
     Json(payload): Json<UpdateUserRequest>,
 ) -> Result<Json<UserResponse>, ApiError> {
+    // Validate input
+    payload.validate()?;
+
     let parsed_id = Uuid::parse_str(&id).map_err(|_| ApiError::invalid_uuid())?;
 
     let request = ServiceUpdateUserRequest {

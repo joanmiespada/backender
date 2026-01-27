@@ -4,6 +4,7 @@ use crate::methods::routes::ROLES_BY_ID_PATH;
 use crate::state::AppState;
 use axum::Json;
 use uuid::Uuid;
+use validator::Validate;
 
 #[utoipa::path(
     put,
@@ -26,6 +27,9 @@ pub async fn update_role(
     axum::extract::State(state): axum::extract::State<AppState>,
     Json(payload): Json<UpdateRoleRequest>,
 ) -> Result<Json<RoleResponse>, ApiError> {
+    // Validate input
+    payload.validate()?;
+
     let parsed_id = Uuid::parse_str(&id).map_err(|_| ApiError::invalid_uuid())?;
 
     state

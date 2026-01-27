@@ -5,6 +5,7 @@ use axum::{
 };
 use serde::Serialize;
 use user_lib::errors_service::UserServiceError;
+use validator::ValidationErrors;
 
 use crate::keycloak::KeycloakError;
 use crate::services::integrated_user_service::IntegratedServiceError;
@@ -123,6 +124,25 @@ impl From<IntegratedServiceError> for ApiError {
             IntegratedServiceError::User(e) => ApiError::from(e),
             IntegratedServiceError::Keycloak(e) => ApiError::from(e),
         }
+    }
+}
+
+impl From<ValidationErrors> for ApiError {
+    fn from(err: ValidationErrors) -> Self {
+        let messages: Vec<String> = err
+            .field_errors()
+            .iter()
+            .flat_map(|(field, errors)| {
+                errors.iter().map(move |e| {
+                    e.message
+                        .as_ref()
+                        .map(|m| m.to_string())
+                        .unwrap_or_else(|| format!("validation failed for {field}"))
+                })
+            })
+            .collect();
+
+        ApiError::BadRequest(messages.join(", "))
     }
 }
 

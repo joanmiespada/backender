@@ -3,7 +3,10 @@ use crate::methods::entities::{CreateUserRequest, UserResponse};
 use crate::methods::routes::USERS_PATH;
 use crate::services::integrated_user_service::CreateUserRequest as ServiceCreateUserRequest;
 use crate::state::AppState;
+use axum::http::StatusCode;
+use axum::response::IntoResponse;
 use axum::Json;
+use validator::Validate;
 
 #[utoipa::path(
     post,
@@ -20,7 +23,10 @@ use axum::Json;
 pub async fn create_user(
     axum::extract::State(state): axum::extract::State<AppState>,
     Json(payload): Json<CreateUserRequest>,
-) -> Result<Json<UserResponse>, ApiError> {
+) -> Result<impl IntoResponse, ApiError> {
+    // Validate input
+    payload.validate()?;
+
     let request = ServiceCreateUserRequest {
         email: payload.email,
         first_name: payload.first_name,
@@ -32,6 +38,6 @@ pub async fn create_user(
         .user_service
         .create_user(request)
         .await
-        .map(|user| Json(UserResponse::from(user)))
+        .map(|user| (StatusCode::CREATED, Json(UserResponse::from(user))))
         .map_err(|e| handle_integrated_service_error(e, &state.env, "create_user"))
 }

@@ -3,25 +3,36 @@ use serde::{Deserialize, Serialize};
 use user_lib::entities::{PaginatedResult, PaginationParams, Role};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
+use validator::Validate;
 
 use crate::keycloak::FullUser;
 
-#[derive(Debug, Deserialize, Serialize, ToSchema)]
+#[derive(Debug, Deserialize, Serialize, ToSchema, Validate)]
 pub struct CreateUserRequest {
+    #[validate(email(message = "Invalid email format"))]
+    #[validate(length(
+        min = 1,
+        max = 254,
+        message = "Email must be between 1 and 254 characters"
+    ))]
     pub email: String,
     #[serde(default)]
+    #[validate(length(max = 100, message = "First name cannot exceed 100 characters"))]
     pub first_name: Option<String>,
     #[serde(default)]
+    #[validate(length(max = 100, message = "Last name cannot exceed 100 characters"))]
     pub last_name: Option<String>,
     #[serde(default, skip_serializing)]
     pub password: Option<Secret<String>>,
 }
 
-#[derive(Debug, Deserialize, Serialize, ToSchema)]
+#[derive(Debug, Deserialize, Serialize, ToSchema, Validate)]
 pub struct UpdateUserRequest {
     #[serde(default)]
+    #[validate(length(max = 100, message = "First name cannot exceed 100 characters"))]
     pub first_name: Option<String>,
     #[serde(default)]
+    #[validate(length(max = 100, message = "Last name cannot exceed 100 characters"))]
     pub last_name: Option<String>,
 }
 
@@ -51,13 +62,23 @@ impl From<FullUser> for UserResponse {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, ToSchema)]
+#[derive(Debug, Deserialize, Serialize, ToSchema, Validate)]
 pub struct CreateRoleRequest {
+    #[validate(length(
+        min = 1,
+        max = 50,
+        message = "Role name must be between 1 and 50 characters"
+    ))]
     pub name: String,
 }
 
-#[derive(Debug, Deserialize, Serialize, ToSchema)]
+#[derive(Debug, Deserialize, Serialize, ToSchema, Validate)]
 pub struct UpdateRoleRequest {
+    #[validate(length(
+        min = 1,
+        max = 50,
+        message = "Role name must be between 1 and 50 characters"
+    ))]
     pub name: String,
 }
 
