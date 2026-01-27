@@ -822,7 +822,7 @@ async fn test_create_user_request_email_too_long() {
 
     // Create an email longer than 254 characters
     let long_local = "a".repeat(250);
-    let long_email = format!("{}@example.com", long_local);
+    let long_email = format!("{long_local}@example.com");
 
     let request = CreateUserRequest {
         email: long_email,

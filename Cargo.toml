@@ -3,5 +3,6 @@ resolver = "2"
 members = [
     "apps/user-api",
     "libs/user-lib",
+    "libs/secrets",
     "apps/backcli",
 ]

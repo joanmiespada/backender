@@ -32,6 +32,7 @@ use tracing_subscriber::EnvFilter;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
+use secrets::SecretsConfig;
 use user_lib::repository::role_repository::RoleRepository;
 use user_lib::repository::user_repository::UserRepository;
 use user_lib::repository::user_role_repository::UserRoleRepository;
@@ -134,6 +135,16 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::info!(service = SERVICE, env = %env, "tracing initialized");
 
+    // Initialize secrets client (tries Infisical first, falls back to env vars)
+    let secrets_config = SecretsConfig::from_env();
+    let secrets_client = secrets::SecretsClient::new(secrets_config).await;
+
+    if secrets_client.has_primary_provider() {
+        tracing::info!("Secrets client initialized with Infisical provider");
+    } else {
+        tracing::info!("Secrets client using environment variables only");
+    }
+
     // Load middleware configuration from environment
     let middleware_config = MiddlewareConfig::from_env();
     tracing::info!(
@@ -169,8 +180,8 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         tracing::warn!("Cache was enabled but Redis connection failed - running in DB-only mode");
     }
 
-    // Setup Keycloak client
-    let keycloak_config = KeycloakConfig::from_env();
+    // Setup Keycloak client (secrets loaded via secrets client)
+    let keycloak_config = KeycloakConfig::from_secrets(&secrets_client).await;
     tracing::info!(
         keycloak_url = %keycloak_config.base_url,
         keycloak_realm = %keycloak_config.realm,

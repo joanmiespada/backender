@@ -71,6 +71,21 @@ wait-db:
     echo "ERROR: MySQL did not become ready in time." >&2
     exit 1
 
+# Wait for Infisical to be ready
+wait-infisical:
+    #!/usr/bin/env bash
+    echo "Waiting for Infisical on 127.0.0.1:${INFISICAL_PORT:-8888}..."
+    for i in {1..60}; do
+        if curl -fsS "http://127.0.0.1:${INFISICAL_PORT:-8888}/api/status" >/dev/null 2>&1; then
+            echo "Infisical is up."
+            echo "Infisical UI available at http://127.0.0.1:${INFISICAL_PORT:-8888}/"
+            exit 0
+        fi
+        sleep 2
+    done
+    echo "ERROR: Infisical did not become ready in time." >&2
+    exit 1
+
 # Run database migrations
 migrate:
     #!/usr/bin/env bash
@@ -79,6 +94,7 @@ migrate:
     cargo run --bin backcli -- --migrations --user-lib
 
 # Setup Keycloak service account and update .env.local with client secret
+# Also stores the secret in Infisical if configured
 setup-keycloak:
     #!/usr/bin/env bash
     set -a && source .env.local && set +a
@@ -121,6 +137,90 @@ setup-keycloak:
         exit 1
     fi
 
+# Store Keycloak secret in Infisical (run after setup-keycloak and setup-infisical)
+sync-keycloak-secret:
+    #!/usr/bin/env bash
+    set -a && source .env.local && set +a
+
+    # Check if Infisical is configured
+    if [ -z "$INFISICAL_CLIENT_ID" ] || [ -z "$INFISICAL_CLIENT_SECRET" ]; then
+        echo "Skipping Infisical sync - Infisical not configured"
+        exit 0
+    fi
+
+    # Check if Keycloak secret exists
+    if [ -z "$KEYCLOAK_CLIENT_SECRET" ]; then
+        echo "ERROR: KEYCLOAK_CLIENT_SECRET not set in .env.local"
+        exit 1
+    fi
+
+    echo "Storing KEYCLOAK_CLIENT_SECRET in Infisical..."
+    cargo run --bin backcli -- --store-secret --key KEYCLOAK_CLIENT_SECRET --value "$KEYCLOAK_CLIENT_SECRET"
+
+    if [ $? -eq 0 ]; then
+        echo "✓ KEYCLOAK_CLIENT_SECRET stored in Infisical"
+        echo ""
+        echo "The user-api will now retrieve KEYCLOAK_CLIENT_SECRET from Infisical."
+        echo "You can remove it from .env.local if desired (Infisical is the source of truth)."
+    else
+        echo "WARNING: Failed to store secret in Infisical"
+        echo "The application will fall back to the .env.local value"
+    fi
+
+# Setup Infisical secrets manager and update .env.local with credentials
+setup-infisical:
+    #!/usr/bin/env bash
+    set -a && source .env.local && set +a
+
+    # Run setup and capture output
+    OUTPUT=$(cargo run --bin backcli -- --setup-infisical 2>&1)
+
+    # Check if setup was successful
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Infisical setup failed"
+        echo "$OUTPUT"
+        exit 1
+    fi
+
+    # Display the output
+    echo "$OUTPUT"
+
+    # Extract credentials from output
+    INFISICAL_URL_VAL=$(echo "$OUTPUT" | grep "^INFISICAL_URL=" | cut -d'=' -f2)
+    CLIENT_ID=$(echo "$OUTPUT" | grep "^INFISICAL_CLIENT_ID=" | cut -d'=' -f2)
+    CLIENT_SECRET=$(echo "$OUTPUT" | grep "^INFISICAL_CLIENT_SECRET=" | cut -d'=' -f2)
+    PROJECT_ID=$(echo "$OUTPUT" | grep "^INFISICAL_PROJECT_ID=" | cut -d'=' -f2)
+    ENVIRONMENT=$(echo "$OUTPUT" | grep "^INFISICAL_ENVIRONMENT=" | cut -d'=' -f2)
+
+    if [ -z "$CLIENT_ID" ] || [ -z "$CLIENT_SECRET" ] || [ -z "$PROJECT_ID" ]; then
+        echo "ERROR: Could not extract credentials from output"
+        exit 1
+    fi
+
+    # Update .env.local file - add or update each variable
+    update_env_var() {
+        local key=$1
+        local value=$2
+        if grep -q "^${key}=" .env.local 2>/dev/null; then
+            if [[ "$OSTYPE" == "darwin"* ]]; then
+                sed -i '' "s|^${key}=.*|${key}=${value}|" .env.local
+            else
+                sed -i "s|^${key}=.*|${key}=${value}|" .env.local
+            fi
+        else
+            echo "${key}=${value}" >> .env.local
+        fi
+    }
+
+    update_env_var "INFISICAL_URL" "$INFISICAL_URL_VAL"
+    update_env_var "INFISICAL_CLIENT_ID" "$CLIENT_ID"
+    update_env_var "INFISICAL_CLIENT_SECRET" "$CLIENT_SECRET"
+    update_env_var "INFISICAL_PROJECT_ID" "$PROJECT_ID"
+    update_env_var "INFISICAL_ENVIRONMENT" "$ENVIRONMENT"
+
+    echo ""
+    echo "✓ Updated Infisical credentials in .env.local"
+
 # Initialize root user in Keycloak and database
 init-root:
     #!/usr/bin/env bash
@@ -128,12 +228,15 @@ init-root:
     export DATABASE_URL="mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@127.0.0.1:${MYSQL_PORT}/${MYSQL_DATABASE}"
     cargo run --bin backcli -- --init-root
 
-# Complete setup: Keycloak + migrations + root user + git hooks
-setup: install-hooks up wait-db setup-keycloak migrate init-root
+# Complete setup: Keycloak + Infisical + migrations + root user + git hooks
+# Order: infisical first (to get credentials), then keycloak, then sync keycloak secret to infisical
+setup: install-hooks up wait-db wait-infisical setup-infisical setup-keycloak sync-keycloak-secret migrate init-root
     @echo ""
     @echo "✓ Complete setup finished!"
     @echo "  - Git hooks installed"
+    @echo "  - Infisical secrets manager configured"
     @echo "  - Keycloak service account configured"
+    @echo "  - Keycloak secret stored in Infisical"
     @echo "  - Database migrations applied"
     @echo "  - Root user initialized"
     @echo ""
@@ -165,6 +268,12 @@ test-integration:
         fi
     fi
     cargo test --package user-lib --test user_service_test -- --nocapture
+
+# Run secrets integration tests (requires running Infisical from docker-compose)
+test-integration-secrets:
+    #!/usr/bin/env bash
+    set -a && source .env.local && set +a
+    cargo test --package secrets --test infisical_integration_test -- --nocapture
 
 # Build all packages
 build:

@@ -26,6 +26,7 @@ utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
 tracing-ecs = "0.5"
 
 user-lib = { path = "../../libs/user-lib" }
+secrets = { path = "../../libs/secrets" }
 
 # Redis caching
 deadpool-redis = "0.18"

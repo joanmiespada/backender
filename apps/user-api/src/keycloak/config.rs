@@ -1,3 +1,4 @@
+use secrets::SecretsClient;
 use std::time::Duration;
 
 const KEYCLOAK_URL: &str = "KEYCLOAK_URL";
@@ -21,6 +22,44 @@ pub struct KeycloakConfig {
 }
 
 impl KeycloakConfig {
+    /// Load Keycloak configuration using the secrets client
+    ///
+    /// Secrets are loaded in this priority order:
+    /// 1. Infisical (if configured)
+    /// 2. Environment variables
+    /// 3. Panic with descriptive error (for required secrets)
+    pub async fn from_secrets(secrets: &SecretsClient) -> Self {
+        // Non-sensitive config can still come from env vars directly
+        let base_url =
+            std::env::var(KEYCLOAK_URL).unwrap_or_else(|_| DEFAULT_KEYCLOAK_URL.to_string());
+        let realm =
+            std::env::var(KEYCLOAK_REALM).unwrap_or_else(|_| DEFAULT_KEYCLOAK_REALM.to_string());
+        let client_id = std::env::var(KEYCLOAK_CLIENT_ID)
+            .unwrap_or_else(|_| DEFAULT_KEYCLOAK_CLIENT_ID.to_string());
+
+        // Sensitive secret - use secrets client with fallback chain
+        // Returns empty string if not found (for backward compatibility)
+        let client_secret = secrets
+            .get_secret_value_optional(KEYCLOAK_CLIENT_SECRET)
+            .await
+            .unwrap_or_default();
+
+        let profile_cache_ttl_secs: u64 = std::env::var(KEYCLOAK_PROFILE_CACHE_TTL_SECS)
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(DEFAULT_PROFILE_CACHE_TTL_SECS);
+
+        Self {
+            base_url,
+            realm,
+            client_id,
+            client_secret,
+            profile_cache_ttl: Duration::from_secs(profile_cache_ttl_secs),
+        }
+    }
+
+    /// Load configuration from environment variables only (for testing/backward compat)
+    #[allow(dead_code)]
     pub fn from_env() -> Self {
         let base_url =
             std::env::var(KEYCLOAK_URL).unwrap_or_else(|_| DEFAULT_KEYCLOAK_URL.to_string());

@@ -64,6 +64,56 @@ services:
     volumes:
       - keycloak-db-data:/var/lib/postgresql/data
 
+  ## 🔑 Infisical (Secrets Management)
+  infisical:
+    image: infisical/infisical:v0.46.2-postgres
+    ports:
+      - "${INFISICAL_PORT:-8888}:8080"
+    environment:
+      # Database
+      DB_CONNECTION_URI: postgres://infisical:password@infisical-db:5432/infisical?sslmode=disable
+      # Redis for caching
+      REDIS_URL: redis://infisical-redis:6379
+      # Encryption keys (generated once, keep consistent)
+      ENCRYPTION_KEY: 6c6976652d6c6f6e672d656e6f7567682d746f2d62652d33322d62797465
+      AUTH_SECRET: 7468697369736d7973757065727365637265746b65796e6f626f64796b6e6f7773
+      # Site configuration
+      SITE_URL: http://localhost:8888
+      # Telemetry (disabled for local dev)
+      TELEMETRY_ENABLED: "false"
+      # Allow signup for local dev
+      INVITE_ONLY_SIGNUP: "false"
+    depends_on:
+      infisical-db:
+        condition: service_healthy
+      infisical-redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/api/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  infisical-db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: infisical
+      POSTGRES_USER: infisical
+      POSTGRES_PASSWORD: password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U infisical -d infisical"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - infisical-db-data:/var/lib/postgresql/data
+
+  infisical-redis:
+    image: redis:7
+    volumes:
+      - infisical-redis-data:/data
+
   ## 🧪 Unleash
   unleash:
     image: unleashorg/unleash-server:5.8.0
@@ -199,6 +249,7 @@ services:
       - mysql
       - redis
       - elasticsearch
+      - infisical
     labels:
       # Enable Filebeat autodiscover hints for this container
       co.elastic.logs/enabled: "true"
@@ -212,6 +263,8 @@ volumes:
   redis-data:
   mysql-data:
   keycloak-db-data:
+  infisical-db-data:
+  infisical-redis-data:
   unleash-db-data:
   es-data:
   grafana-data:

@@ -1,5 +1,6 @@
 // apps/backcli/src/main.rs
 
+mod infisical_setup;
 mod keycloak_setup;
 
 use clap::{Arg, ArgAction, Command};
@@ -55,6 +56,30 @@ async fn main() {
                 .action(ArgAction::SetTrue)
                 .help("Setup Keycloak service account client and retrieve secret"),
         )
+        .arg(
+            Arg::new("setup-infisical")
+                .long("setup-infisical")
+                .action(ArgAction::SetTrue)
+                .help("Setup Infisical secrets manager and retrieve machine identity credentials"),
+        )
+        .arg(
+            Arg::new("store-secret")
+                .long("store-secret")
+                .action(ArgAction::SetTrue)
+                .help("Store a secret in Infisical (requires --key and --value)"),
+        )
+        .arg(
+            Arg::new("key")
+                .long("key")
+                .value_name("KEY")
+                .help("Secret key name (used with --store-secret)"),
+        )
+        .arg(
+            Arg::new("value")
+                .long("value")
+                .value_name("VALUE")
+                .help("Secret value (used with --store-secret)"),
+        )
         .get_matches();
 
     if matches.get_flag("migrations") {
@@ -94,6 +119,27 @@ async fn main() {
     if matches.get_flag("setup-keycloak") {
         if let Err(e) = setup_keycloak().await {
             eprintln!("Error setting up Keycloak: {e}");
+            std::process::exit(1);
+        }
+    }
+
+    if matches.get_flag("setup-infisical") {
+        if let Err(e) = setup_infisical().await {
+            eprintln!("Error setting up Infisical: {e}");
+            std::process::exit(1);
+        }
+    }
+
+    if matches.get_flag("store-secret") {
+        let key = matches
+            .get_one::<String>("key")
+            .expect("--key is required with --store-secret");
+        let value = matches
+            .get_one::<String>("value")
+            .expect("--value is required with --store-secret");
+
+        if let Err(e) = store_secret(key, value).await {
+            eprintln!("Error storing secret: {e}");
             std::process::exit(1);
         }
     }
@@ -243,6 +289,34 @@ async fn setup_keycloak() -> Result<(), String> {
     println!("\n✓ Keycloak service account setup complete!");
     println!("\nAdd this to your .env.local file:");
     println!("KEYCLOAK_CLIENT_SECRET={secret}");
+
+    Ok(())
+}
+
+/// Setup Infisical secrets manager
+async fn setup_infisical() -> Result<(), String> {
+    println!("Setting up Infisical secrets manager...\n");
+
+    let setup = infisical_setup::InfisicalSetup::from_env()?;
+    let credentials = setup.setup().await?;
+
+    println!("\n✓ Infisical setup complete!");
+    println!("\nAdd these to your .env.local file:");
+    println!("INFISICAL_URL={}", credentials.url);
+    println!("INFISICAL_CLIENT_ID={}", credentials.client_id);
+    println!("INFISICAL_CLIENT_SECRET={}", credentials.client_secret);
+    println!("INFISICAL_PROJECT_ID={}", credentials.project_id);
+    println!("INFISICAL_ENVIRONMENT={}", credentials.environment);
+
+    Ok(())
+}
+
+/// Store a secret in Infisical
+async fn store_secret(key: &str, value: &str) -> Result<(), String> {
+    let setup = infisical_setup::InfisicalSetup::from_env()?;
+    setup.store_secret(key, value).await?;
+
+    println!("✓ Secret '{key}' stored in Infisical");
 
     Ok(())
 }
