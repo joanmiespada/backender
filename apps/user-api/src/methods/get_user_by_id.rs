@@ -1,9 +1,9 @@
+use crate::error::{handle_integrated_service_error, ApiError};
+use crate::methods::entities::UserResponse;
+use crate::methods::routes::USERS_BY_ID_PATH;
+use crate::state::AppState;
 use axum::Json;
 use uuid::Uuid;
-use crate::error::{ApiError, handle_integrated_service_error};
-use crate::methods::entities::UserResponse;
-use crate::state::AppState;
-use crate::methods::routes::USERS_BY_ID_PATH;
 
 #[utoipa::path(
     get,
@@ -25,10 +25,11 @@ pub async fn get_user_by_id(
 ) -> Result<Json<UserResponse>, ApiError> {
     let parsed_id = Uuid::parse_str(&id).map_err(|_| ApiError::invalid_uuid())?;
 
-    state.user_service
+    state
+        .user_service
         .get_user(parsed_id)
         .await
         .map_err(|e| handle_integrated_service_error(e, &state.env, "get_user"))?
         .map(|user| Json(UserResponse::from(user)))
-        .ok_or_else(|| ApiError::user_not_found())
+        .ok_or_else(ApiError::user_not_found)
 }

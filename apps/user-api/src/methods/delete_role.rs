@@ -1,8 +1,8 @@
+use crate::error::{handle_integrated_service_error, ApiError};
+use crate::methods::routes::ROLES_BY_ID_PATH;
+use crate::state::AppState;
 use axum::http::StatusCode;
 use uuid::Uuid;
-use crate::error::{ApiError, handle_integrated_service_error};
-use crate::state::AppState;
-use crate::methods::routes::ROLES_BY_ID_PATH;
 
 #[utoipa::path(
     delete,
@@ -24,7 +24,8 @@ pub async fn delete_role(
 ) -> Result<StatusCode, ApiError> {
     let parsed_id = Uuid::parse_str(&id).map_err(|_| ApiError::invalid_uuid())?;
 
-    state.user_service
+    state
+        .user_service
         .delete_role(parsed_id)
         .await
         .map(|_| StatusCode::NO_CONTENT)

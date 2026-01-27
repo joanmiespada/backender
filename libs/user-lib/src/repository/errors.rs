@@ -1,4 +1,3 @@
-
 #[derive(Debug)]
 pub enum UserRepositoryError {
     EmailAlreadyExists,
@@ -38,7 +37,6 @@ impl From<sqlx::Error> for UserRepositoryError {
     }
 }
 
-
 fn extract_mysql_key_name(msg_lower: &str) -> Option<String> {
     // msg_lower is already lowercased
     let marker = "for key '";
@@ -49,7 +47,6 @@ fn extract_mysql_key_name(msg_lower: &str) -> Option<String> {
 }
 
 pub fn map_sqlx_error(err: sqlx::Error) -> UserRepositoryError {
-
     const USER_EMAIL_UNIQUE: &str = "user_email_unique";
     const ROLE_NAME_UNIQUE: &str = "role_name_unique";
     const USER_ROLES_PK: &str = "user_roles_pk";

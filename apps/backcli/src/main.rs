@@ -9,11 +9,12 @@ use std::sync::Arc;
 use tracing_subscriber::EnvFilter;
 
 use user_api::keycloak::{KeycloakClient, KeycloakConfig};
-use user_lib::repository::{UserRepository, RoleRepository, UserRoleRepository};
-use user_lib::rootuser::{RootUserConfig, initialize_root_user};
+use user_lib::repository::{RoleRepository, UserRepository, UserRoleRepository};
+use user_lib::rootuser::{initialize_root_user, RootUserConfig};
 
 // NOTE: sqlx::migrate!(...) paths are resolved relative to this crate's directory (apps/backcli)
-static USER_LIB_MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!  ("../../libs/user-lib/migrations");
+static USER_LIB_MIGRATOR: sqlx::migrate::Migrator =
+    sqlx::migrate!("../../libs/user-lib/migrations");
 
 #[tokio::main]
 async fn main() {
@@ -70,7 +71,7 @@ async fn main() {
         }
     }
 
-    if matches.get_flag("delete"){
+    if matches.get_flag("delete") {
         let result = if matches.get_flag("user-lib") {
             run_user_lib_delete().await
         } else {
@@ -99,8 +100,8 @@ async fn main() {
 }
 
 async fn run_user_lib_migrations() -> Result<(), String> {
-    let db_url = std::env::var("DATABASE_URL")
-        .map_err(|_| "DATABASE_URL must be set".to_string())?;
+    let db_url =
+        std::env::var("DATABASE_URL").map_err(|_| "DATABASE_URL must be set".to_string())?;
 
     let pool = MySqlPool::connect(&db_url)
         .await
@@ -117,8 +118,8 @@ async fn run_user_lib_migrations() -> Result<(), String> {
 }
 
 async fn run_user_lib_delete() -> Result<(), String> {
-    let db_url = std::env::var("DATABASE_URL")
-        .map_err(|_| "DATABASE_URL must be set".to_string())?;
+    let db_url =
+        std::env::var("DATABASE_URL").map_err(|_| "DATABASE_URL must be set".to_string())?;
 
     let pool = MySqlPool::connect(&db_url)
         .await
@@ -160,26 +161,28 @@ async fn init_root_user() -> Result<(), String> {
     println!("Creating user in Keycloak...");
 
     // Step 2: Create user in Keycloak
-    let keycloak_id = keycloak.create_user(
-        &config.email,
-        Some(&config.first_name),
-        Some(&config.last_name),
-        Some(&Secret::new(password)),
-    ).await
-    .map_err(|e| format!("Failed to create user in Keycloak: {}", e))?;
+    let keycloak_id = keycloak
+        .create_user(
+            &config.email,
+            Some(&config.first_name),
+            Some(&config.last_name),
+            Some(&Secret::new(password)),
+        )
+        .await
+        .map_err(|e| format!("Failed to create user in Keycloak: {e}"))?;
 
-    println!("✓ User created in Keycloak with ID: {}", keycloak_id);
+    println!("✓ User created in Keycloak with ID: {keycloak_id}");
 
     // Update config with keycloak_id
     config.keycloak_id = keycloak_id.clone();
 
     // Step 3: Connect to database
-    let db_url = std::env::var("DATABASE_URL")
-        .map_err(|_| "DATABASE_URL must be set".to_string())?;
+    let db_url =
+        std::env::var("DATABASE_URL").map_err(|_| "DATABASE_URL must be set".to_string())?;
 
     let pool = MySqlPool::connect(&db_url)
         .await
-        .map_err(|e| format!("Failed to connect to database: {}", e))?;
+        .map_err(|e| format!("Failed to connect to database: {e}"))?;
 
     // Step 4: Initialize repositories
     let user_repo = UserRepository::new(pool.clone());
@@ -189,33 +192,36 @@ async fn init_root_user() -> Result<(), String> {
     println!("Creating user in database and assigning admin role...");
 
     // Step 5: Initialize root user in database
-    let user = initialize_root_user(
-        &user_repo,
-        &role_repo,
-        &user_role_repo,
-        &config,
-    ).await
-    .map_err(|e| {
-        // If DB creation fails, we should delete from Keycloak
-        let kc_clone = keycloak.clone();
-        let kc_id = keycloak_id.clone();
-        tokio::spawn(async move {
-            if let Err(del_err) = kc_clone.delete_user(&kc_id).await {
-                eprintln!("WARNING: Failed to rollback Keycloak user: {}", del_err);
-                eprintln!("Manual cleanup required for Keycloak user: {}", kc_id);
-            } else {
-                println!("✓ Rolled back Keycloak user due to database error");
-            }
-        });
-        format!("Failed to initialize user in database: {}", e)
-    })?;
+    let user = initialize_root_user(&user_repo, &role_repo, &user_role_repo, &config)
+        .await
+        .map_err(|e| {
+            // If DB creation fails, we should delete from Keycloak
+            let kc_clone = keycloak.clone();
+            let kc_id = keycloak_id.clone();
+            tokio::spawn(async move {
+                if let Err(del_err) = kc_clone.delete_user(&kc_id).await {
+                    eprintln!("WARNING: Failed to rollback Keycloak user: {del_err}");
+                    eprintln!("Manual cleanup required for Keycloak user: {kc_id}");
+                } else {
+                    println!("✓ Rolled back Keycloak user due to database error");
+                }
+            });
+            format!("Failed to initialize user in database: {e}")
+        })?;
 
     println!("✓ User created in database with ID: {}", user.id);
     println!("✓ Admin role assigned to user");
     println!("\nRoot user initialized successfully!");
     println!("  User ID: {}", user.id);
     println!("  Keycloak ID: {}", user.keycloak_id);
-    println!("  Roles: {}", user.roles.iter().map(|r| r.name.as_str()).collect::<Vec<_>>().join(", "));
+    println!(
+        "  Roles: {}",
+        user.roles
+            .iter()
+            .map(|r| r.name.as_str())
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
 
     Ok(())
 }
@@ -225,8 +231,8 @@ async fn setup_keycloak() -> Result<(), String> {
     println!("Setting up Keycloak service account...\n");
 
     // Get the client ID from environment
-    let client_id = std::env::var("KEYCLOAK_CLIENT_ID")
-        .unwrap_or_else(|_| "user-api-service".to_string());
+    let client_id =
+        std::env::var("KEYCLOAK_CLIENT_ID").unwrap_or_else(|_| "user-api-service".to_string());
 
     // Initialize Keycloak setup
     let setup = keycloak_setup::KeycloakSetup::from_env()?;
@@ -236,7 +242,7 @@ async fn setup_keycloak() -> Result<(), String> {
 
     println!("\n✓ Keycloak service account setup complete!");
     println!("\nAdd this to your .env.local file:");
-    println!("KEYCLOAK_CLIENT_SECRET={}", secret);
+    println!("KEYCLOAK_CLIENT_SECRET={secret}");
 
     Ok(())
 }

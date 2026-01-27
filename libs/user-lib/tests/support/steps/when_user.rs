@@ -14,14 +14,12 @@ pub async fn create_user(world: &mut TestWorld, keycloak_id: String) {
     let service = world.create_service_with_mocks(
         move |user_repo| {
             let kc = kc_id_clone.clone();
-            user_repo
-                .expect_create_user()
-                .returning(move |_| {
-                    Ok(UserRow {
-                        id: user_id.to_string(),
-                        keycloak_id: kc.clone(),
-                    })
-                });
+            user_repo.expect_create_user().returning(move |_| {
+                Ok(UserRow {
+                    id: user_id.to_string(),
+                    keycloak_id: kc.clone(),
+                })
+            });
         },
         |_| {},
         |_| {},
@@ -38,14 +36,12 @@ pub async fn retrieve_user_by_id(world: &mut TestWorld) {
     let service = world.create_service_with_mocks(
         move |user_repo| {
             let u = user.clone();
-            user_repo
-                .expect_get_user()
-                .returning(move |_| {
-                    Ok(Some(UserRow {
-                        id: u.id.to_string(),
-                        keycloak_id: u.keycloak_id.clone(),
-                    }))
-                });
+            user_repo.expect_get_user().returning(move |_| {
+                Ok(Some(UserRow {
+                    id: u.id.to_string(),
+                    keycloak_id: u.keycloak_id.clone(),
+                }))
+            });
         },
         |role_repo| {
             role_repo
@@ -64,9 +60,7 @@ pub async fn retrieve_random_user(world: &mut TestWorld) {
 
     let service = world.create_service_with_mocks(
         |user_repo| {
-            user_repo
-                .expect_get_user()
-                .returning(|_| Ok(None));
+            user_repo.expect_get_user().returning(|_| Ok(None));
         },
         |_| {},
         |_| {},
@@ -81,9 +75,7 @@ pub async fn delete_user(world: &mut TestWorld) {
 
     let service = world.create_service_with_mocks(
         |user_repo| {
-            user_repo
-                .expect_delete_user()
-                .returning(|_| Ok(()));
+            user_repo.expect_delete_user().returning(|_| Ok(()));
         },
         |_| {},
         |_| {},

@@ -6,7 +6,10 @@ use crate::support::world::TestWorld;
 
 #[then("the user should be created successfully")]
 pub async fn user_created_successfully(world: &mut TestWorld) {
-    assert!(world.user_result.as_ref().unwrap().is_ok(), "User creation should succeed");
+    assert!(
+        world.user_result.as_ref().unwrap().is_ok(),
+        "User creation should succeed"
+    );
     world.current_user = world.user_result.as_ref().unwrap().as_ref().ok().cloned();
 }
 
@@ -24,7 +27,10 @@ pub async fn user_has_no_roles(world: &mut TestWorld) {
 
 #[then("the user should be found")]
 pub async fn user_found(world: &mut TestWorld) {
-    let result = world.optional_user_result.as_ref().expect("Result should exist");
+    let result = world
+        .optional_user_result
+        .as_ref()
+        .expect("Result should exist");
     assert!(result.is_ok());
     assert!(result.as_ref().unwrap().is_some());
     world.current_user = result.as_ref().unwrap().clone();
@@ -32,7 +38,10 @@ pub async fn user_found(world: &mut TestWorld) {
 
 #[then("the user should not be found")]
 pub async fn user_not_found(world: &mut TestWorld) {
-    let result = world.optional_user_result.as_ref().expect("Result should exist");
+    let result = world
+        .optional_user_result
+        .as_ref()
+        .expect("Result should exist");
     assert!(result.is_ok());
     assert!(result.as_ref().unwrap().is_none());
 }
@@ -49,7 +58,10 @@ pub async fn user_no_longer_exists(world: &mut TestWorld) {
 
 #[then(expr = "I should receive {int} users")]
 pub async fn receive_users_count(world: &mut TestWorld, count: usize) {
-    let result = world.paginated_users_result.as_ref().expect("Result should exist");
+    let result = world
+        .paginated_users_result
+        .as_ref()
+        .expect("Result should exist");
     assert!(result.is_ok());
     let paginated = result.as_ref().unwrap();
     assert_eq!(paginated.items.len(), count);
@@ -57,14 +69,20 @@ pub async fn receive_users_count(world: &mut TestWorld, count: usize) {
 
 #[then(expr = "the total count should be {int}")]
 pub async fn total_count(world: &mut TestWorld, count: u64) {
-    let result = world.paginated_users_result.as_ref().expect("Result should exist");
+    let result = world
+        .paginated_users_result
+        .as_ref()
+        .expect("Result should exist");
     let paginated = result.as_ref().unwrap();
     assert_eq!(paginated.total, count);
 }
 
 #[then(expr = "the total pages should be {int}")]
 pub async fn total_pages(world: &mut TestWorld, pages: u32) {
-    let result = world.paginated_users_result.as_ref().expect("Result should exist");
+    let result = world
+        .paginated_users_result
+        .as_ref()
+        .expect("Result should exist");
     let paginated = result.as_ref().unwrap();
     assert_eq!(paginated.total_pages, pages);
 }
@@ -77,13 +95,18 @@ pub async fn validation_error(world: &mut TestWorld) {
 #[then(expr = "the error message should contain {string}")]
 pub async fn error_message_contains(world: &mut TestWorld, expected: String) {
     let error = world.error.as_ref().expect("Error should exist");
-    assert!(error.to_string().contains(&expected),
-        "Error '{}' should contain '{}'", error, expected);
+    assert!(
+        error.to_string().contains(&expected),
+        "Error '{error}' should contain '{expected}'"
+    );
 }
 
 #[then(expr = "I should receive {int} users with that role")]
 pub async fn receive_users_with_role_count(world: &mut TestWorld, count: usize) {
-    let result = world.paginated_users_result.as_ref().expect("Result should exist");
+    let result = world
+        .paginated_users_result
+        .as_ref()
+        .expect("Result should exist");
     assert!(result.is_ok());
     let paginated = result.as_ref().unwrap();
     assert_eq!(paginated.items.len(), count);

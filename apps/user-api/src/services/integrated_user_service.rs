@@ -4,17 +4,20 @@ use uuid::Uuid;
 
 use user_lib::entities::{PaginatedResult, PaginationParams, Role};
 use user_lib::errors_service::UserServiceError;
-use user_lib::repository::traits::{RoleRepositoryTrait, UserRepositoryTrait, UserRoleRepositoryTrait};
+use user_lib::repository::traits::{
+    RoleRepositoryTrait, UserRepositoryTrait, UserRoleRepositoryTrait,
+};
 
 use crate::cache::{CachedUserService, RedisCache};
 use crate::keycloak::{FullUser, KeycloakClient, KeycloakError, KeycloakUser};
 
 /// Cache key for Keycloak profiles
 fn keycloak_profile_key(keycloak_id: &str) -> String {
-    format!("user-api:kc:profile:{}", keycloak_id)
+    format!("user-api:kc:profile:{keycloak_id}")
 }
 
 /// Pattern for all Keycloak profile keys
+#[allow(dead_code)]
 pub fn keycloak_profiles_pattern() -> String {
     "user-api:kc:profile:*".to_string()
 }
@@ -43,8 +46,8 @@ pub enum IntegratedServiceError {
 impl std::fmt::Display for IntegratedServiceError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            IntegratedServiceError::User(e) => write!(f, "{}", e),
-            IntegratedServiceError::Keycloak(e) => write!(f, "{}", e),
+            IntegratedServiceError::User(e) => write!(f, "{e}"),
+            IntegratedServiceError::Keycloak(e) => write!(f, "{e}"),
         }
     }
 }
@@ -94,7 +97,10 @@ where
     }
 
     /// Get cached Keycloak profile or fetch from Keycloak
-    async fn get_keycloak_profile(&self, keycloak_id: &str) -> Result<Option<KeycloakUser>, KeycloakError> {
+    async fn get_keycloak_profile(
+        &self,
+        keycloak_id: &str,
+    ) -> Result<Option<KeycloakUser>, KeycloakError> {
         if !self.keycloak.is_configured() {
             return Ok(None);
         }
@@ -114,7 +120,9 @@ where
         // Cache if found
         if let Some(ref p) = profile {
             if self.redis.is_enabled() {
-                self.redis.set(&cache_key, p, self.keycloak.profile_cache_ttl()).await;
+                self.redis
+                    .set(&cache_key, p, self.keycloak.profile_cache_ttl())
+                    .await;
             }
         }
 
@@ -130,7 +138,11 @@ where
     }
 
     /// Merge local user with Keycloak profile
-    fn merge_user(&self, local: user_lib::entities::User, kc_profile: Option<KeycloakUser>) -> FullUser {
+    fn merge_user(
+        &self,
+        local: user_lib::entities::User,
+        kc_profile: Option<KeycloakUser>,
+    ) -> FullUser {
         match kc_profile {
             Some(kc) => FullUser {
                 id: local.id,
@@ -144,7 +156,10 @@ where
             None => FullUser {
                 id: local.id,
                 keycloak_id: local.keycloak_id.clone(),
-                name: format!("User {}", &local.keycloak_id[..8.min(local.keycloak_id.len())]),
+                name: format!(
+                    "User {}",
+                    &local.keycloak_id[..8.min(local.keycloak_id.len())]
+                ),
                 email: None,
                 roles: local.roles,
                 email_verified: false,
@@ -156,12 +171,19 @@ where
     // ========== User Operations ==========
 
     /// Get a user by ID with merged Keycloak profile
-    pub async fn get_user(&self, user_id: Uuid) -> Result<Option<FullUser>, IntegratedServiceError> {
+    pub async fn get_user(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Option<FullUser>, IntegratedServiceError> {
         let local = self.inner.get_user(user_id).await?;
 
         match local {
             Some(user) => {
-                let kc_profile = self.get_keycloak_profile(&user.keycloak_id).await.ok().flatten();
+                let kc_profile = self
+                    .get_keycloak_profile(&user.keycloak_id)
+                    .await
+                    .ok()
+                    .flatten();
                 Ok(Some(self.merge_user(user, kc_profile)))
             }
             None => Ok(None),
@@ -177,7 +199,11 @@ where
 
         let mut full_users = Vec::with_capacity(result.items.len());
         for user in result.items {
-            let kc_profile = self.get_keycloak_profile(&user.keycloak_id).await.ok().flatten();
+            let kc_profile = self
+                .get_keycloak_profile(&user.keycloak_id)
+                .await
+                .ok()
+                .flatten();
             full_users.push(self.merge_user(user, kc_profile));
         }
 
@@ -192,14 +218,20 @@ where
 
     /// Create a new user in Keycloak and local DB
     /// Implements compensation transaction: if local DB creation fails, rolls back Keycloak user
-    pub async fn create_user(&self, request: CreateUserRequest) -> Result<FullUser, IntegratedServiceError> {
+    pub async fn create_user(
+        &self,
+        request: CreateUserRequest,
+    ) -> Result<FullUser, IntegratedServiceError> {
         // Create in Keycloak first
-        let keycloak_id = self.keycloak.create_user(
-            &request.email,
-            request.first_name.as_deref(),
-            request.last_name.as_deref(),
-            request.password.as_ref(),
-        ).await?;
+        let keycloak_id = self
+            .keycloak
+            .create_user(
+                &request.email,
+                request.first_name.as_deref(),
+                request.last_name.as_deref(),
+                request.password.as_ref(),
+            )
+            .await?;
 
         // Create local record with compensation on failure
         let local = match self.inner.create_user(&keycloak_id).await {
@@ -244,21 +276,30 @@ where
         request: UpdateUserRequest,
     ) -> Result<FullUser, IntegratedServiceError> {
         // Get local user to find keycloak_id
-        let local = self.inner.get_user(user_id).await?
+        let local = self
+            .inner
+            .get_user(user_id)
+            .await?
             .ok_or(IntegratedServiceError::User(UserServiceError::NotFound))?;
 
         // Update in Keycloak
-        self.keycloak.update_user(
-            &local.keycloak_id,
-            request.first_name.as_deref(),
-            request.last_name.as_deref(),
-        ).await?;
+        self.keycloak
+            .update_user(
+                &local.keycloak_id,
+                request.first_name.as_deref(),
+                request.last_name.as_deref(),
+            )
+            .await?;
 
         // Invalidate KC cache
         self.invalidate_keycloak_cache(&local.keycloak_id).await;
 
         // Fetch fresh profile
-        let kc_profile = self.get_keycloak_profile(&local.keycloak_id).await.ok().flatten();
+        let kc_profile = self
+            .get_keycloak_profile(&local.keycloak_id)
+            .await
+            .ok()
+            .flatten();
 
         Ok(self.merge_user(local, kc_profile))
     }
@@ -266,7 +307,10 @@ where
     /// Delete a user from both Keycloak and local DB
     pub async fn delete_user(&self, user_id: Uuid) -> Result<(), IntegratedServiceError> {
         // Get local user to find keycloak_id
-        let local = self.inner.get_user(user_id).await?
+        let local = self
+            .inner
+            .get_user(user_id)
+            .await?
             .ok_or(IntegratedServiceError::User(UserServiceError::NotFound))?;
 
         // Delete from Keycloak
@@ -282,7 +326,11 @@ where
     }
 
     /// Sync a user from Keycloak - creates local record if not exists
-    pub async fn sync_from_keycloak(&self, keycloak_id: &str) -> Result<FullUser, IntegratedServiceError> {
+    #[allow(dead_code)]
+    pub async fn sync_from_keycloak(
+        &self,
+        keycloak_id: &str,
+    ) -> Result<FullUser, IntegratedServiceError> {
         // Check if local record exists
         let existing = self.inner.get_user_by_keycloak_id(keycloak_id).await?;
 
@@ -317,7 +365,11 @@ where
         Ok(self.inner.create_role(name).await?)
     }
 
-    pub async fn update_role(&self, role_id: Uuid, name: &str) -> Result<Role, IntegratedServiceError> {
+    pub async fn update_role(
+        &self,
+        role_id: Uuid,
+        name: &str,
+    ) -> Result<Role, IntegratedServiceError> {
         Ok(self.inner.update_role(role_id, name).await?)
     }
 
@@ -325,7 +377,11 @@ where
         Ok(self.inner.delete_role(role_id).await?)
     }
 
-    pub async fn assign_role(&self, user_id: Uuid, role_id: Uuid) -> Result<(), IntegratedServiceError> {
+    pub async fn assign_role(
+        &self,
+        user_id: Uuid,
+        role_id: Uuid,
+    ) -> Result<(), IntegratedServiceError> {
         self.inner.assign_role(user_id, role_id).await?;
 
         // Also invalidate user caches since role assignment affects the user
@@ -336,7 +392,11 @@ where
         Ok(())
     }
 
-    pub async fn unassign_role(&self, user_id: Uuid, role_id: Uuid) -> Result<(), IntegratedServiceError> {
+    pub async fn unassign_role(
+        &self,
+        user_id: Uuid,
+        role_id: Uuid,
+    ) -> Result<(), IntegratedServiceError> {
         self.inner.unassign_role(user_id, role_id).await?;
 
         // Also invalidate user caches since role unassignment affects the user

@@ -1,10 +1,10 @@
-use axum::Json;
-use uuid::Uuid;
-use crate::error::{ApiError, handle_integrated_service_error};
+use crate::error::{handle_integrated_service_error, ApiError};
 use crate::methods::entities::{UpdateUserRequest, UserResponse};
+use crate::methods::routes::USERS_BY_ID_PATH;
 use crate::services::integrated_user_service::UpdateUserRequest as ServiceUpdateUserRequest;
 use crate::state::AppState;
-use crate::methods::routes::USERS_BY_ID_PATH;
+use axum::Json;
+use uuid::Uuid;
 
 #[utoipa::path(
     put,
@@ -33,7 +33,8 @@ pub async fn update_user(
         last_name: payload.last_name,
     };
 
-    state.user_service
+    state
+        .user_service
         .update_user(parsed_id, request)
         .await
         .map(|user| Json(UserResponse::from(user)))

@@ -1,9 +1,9 @@
+use crate::error::{handle_integrated_service_error, ApiError};
+use crate::methods::entities::{RoleResponse, UpdateRoleRequest};
+use crate::methods::routes::ROLES_BY_ID_PATH;
+use crate::state::AppState;
 use axum::Json;
 use uuid::Uuid;
-use crate::error::{ApiError, handle_integrated_service_error};
-use crate::methods::entities::{UpdateRoleRequest, RoleResponse};
-use crate::state::AppState;
-use crate::methods::routes::ROLES_BY_ID_PATH;
 
 #[utoipa::path(
     put,
@@ -28,7 +28,8 @@ pub async fn update_role(
 ) -> Result<Json<RoleResponse>, ApiError> {
     let parsed_id = Uuid::parse_str(&id).map_err(|_| ApiError::invalid_uuid())?;
 
-    state.user_service
+    state
+        .user_service
         .update_role(parsed_id, &payload.name)
         .await
         .map(|role| Json(RoleResponse::from(role)))

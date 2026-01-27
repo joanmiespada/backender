@@ -1,9 +1,9 @@
-use axum::Json;
-use crate::error::{ApiError, handle_integrated_service_error};
+use crate::error::{handle_integrated_service_error, ApiError};
 use crate::methods::entities::{CreateUserRequest, UserResponse};
+use crate::methods::routes::USERS_PATH;
 use crate::services::integrated_user_service::CreateUserRequest as ServiceCreateUserRequest;
 use crate::state::AppState;
-use crate::methods::routes::USERS_PATH;
+use axum::Json;
 
 #[utoipa::path(
     post,
@@ -28,7 +28,8 @@ pub async fn create_user(
         password: payload.password,
     };
 
-    state.user_service
+    state
+        .user_service
         .create_user(request)
         .await
         .map(|user| Json(UserResponse::from(user)))

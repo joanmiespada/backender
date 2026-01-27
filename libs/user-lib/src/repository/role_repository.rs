@@ -26,7 +26,7 @@ impl RoleRepositoryTrait for RoleRepository {
             r#"
             INSERT INTO roles (id, name)
             VALUES (?, ?)
-            "#
+            "#,
         )
         .bind(id.to_string())
         .bind(name)
@@ -34,13 +34,11 @@ impl RoleRepositoryTrait for RoleRepository {
         .await
         .map_err(map_sqlx_error)?;
 
-        let role = query_as::<_, RoleRow>(
-            r#"SELECT id, name FROM roles WHERE id = ? "#
-        )
-        .bind(id.to_string())
-        .fetch_one(&self.pool)
-        .await
-        .map_err(map_sqlx_error)?;
+        let role = query_as::<_, RoleRow>(r#"SELECT id, name FROM roles WHERE id = ? "#)
+            .bind(id.to_string())
+            .fetch_one(&self.pool)
+            .await
+            .map_err(map_sqlx_error)?;
         Ok(role)
     }
 
@@ -48,7 +46,7 @@ impl RoleRepositoryTrait for RoleRepository {
         let role = query_as::<_, RoleRow>(
             r#"
             SELECT id, name FROM roles WHERE id = ?
-            "#
+            "#,
         )
         .bind(role_id)
         .fetch_optional(&self.pool)
@@ -63,7 +61,7 @@ impl RoleRepositoryTrait for RoleRepository {
             UPDATE roles
             SET name = ?
             WHERE id = ?
-            "#
+            "#,
         )
         .bind(name)
         .bind(role_id)
@@ -71,13 +69,11 @@ impl RoleRepositoryTrait for RoleRepository {
         .await
         .map_err(map_sqlx_error)?;
 
-        let role = query_as::<_, RoleRow>(
-            r#"SELECT id, name FROM roles WHERE id = ? "#
-        )
-        .bind(role_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(map_sqlx_error)?;
+        let role = query_as::<_, RoleRow>(r#"SELECT id, name FROM roles WHERE id = ? "#)
+            .bind(role_id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(map_sqlx_error)?;
         Ok(role)
     }
 
@@ -85,7 +81,7 @@ impl RoleRepositoryTrait for RoleRepository {
         sqlx::query(
             r#"
             DELETE FROM roles WHERE id = ?
-            "#
+            "#,
         )
         .bind(role_id)
         .execute(&self.pool)
@@ -101,7 +97,7 @@ impl RoleRepositoryTrait for RoleRepository {
             FROM roles r
             INNER JOIN user_roles ur ON ur.role_id = r.id
             WHERE ur.user_id = ?
-            "#
+            "#,
         )
         .bind(user_id)
         .fetch_all(&self.pool)
@@ -110,7 +106,10 @@ impl RoleRepositoryTrait for RoleRepository {
         Ok(roles)
     }
 
-    async fn get_roles_for_users(&self, user_ids: &[String]) -> Result<Vec<UserRoleMapping>, UserRepositoryError> {
+    async fn get_roles_for_users(
+        &self,
+        user_ids: &[String],
+    ) -> Result<Vec<UserRoleMapping>, UserRepositoryError> {
         if user_ids.is_empty() {
             return Ok(vec![]);
         }
@@ -125,9 +124,8 @@ impl RoleRepositoryTrait for RoleRepository {
             SELECT ur.user_id, r.id as role_id, r.name as role_name
             FROM roles r
             INNER JOIN user_roles ur ON ur.role_id = r.id
-            WHERE ur.user_id IN ({})
-            "#,
-            placeholders
+            WHERE ur.user_id IN ({placeholders})
+            "#
         );
 
         let mut query = sqlx::query_as::<_, UserRoleMapping>(&query_str);
@@ -138,7 +136,10 @@ impl RoleRepositoryTrait for RoleRepository {
         Ok(mappings)
     }
 
-    async fn get_roles_paginated(&self, pagination: PaginationParams) -> Result<(Vec<RoleRow>, u64), UserRepositoryError> {
+    async fn get_roles_paginated(
+        &self,
+        pagination: PaginationParams,
+    ) -> Result<(Vec<RoleRow>, u64), UserRepositoryError> {
         let total: i64 = query_scalar("SELECT COUNT(*) FROM roles")
             .fetch_one(&self.pool)
             .await
@@ -149,7 +150,7 @@ impl RoleRepositoryTrait for RoleRepository {
             SELECT id, name FROM roles
             ORDER BY name
             LIMIT ? OFFSET ?
-            "#
+            "#,
         )
         .bind(pagination.limit())
         .bind(pagination.offset())

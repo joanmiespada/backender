@@ -1,9 +1,9 @@
+use crate::error::{handle_integrated_service_error, ApiError};
+use crate::methods::assign_role::UserRolePath;
+use crate::methods::routes::USER_ROLES_PATH;
+use crate::state::AppState;
 use axum::http::StatusCode;
 use uuid::Uuid;
-use crate::error::{ApiError, handle_integrated_service_error};
-use crate::state::AppState;
-use crate::methods::routes::USER_ROLES_PATH;
-use crate::methods::assign_role::UserRolePath;
 
 #[utoipa::path(
     delete,
@@ -27,7 +27,8 @@ pub async fn unassign_role(
     let user_id = Uuid::parse_str(&path.user_id).map_err(|_| ApiError::invalid_user_uuid())?;
     let role_id = Uuid::parse_str(&path.role_id).map_err(|_| ApiError::invalid_role_uuid())?;
 
-    state.user_service
+    state
+        .user_service
         .unassign_role(user_id, role_id)
         .await
         .map(|_| StatusCode::NO_CONTENT)

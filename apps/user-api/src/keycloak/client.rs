@@ -88,7 +88,10 @@ impl KeycloakClient {
 
         {
             let mut token_guard = self.token.write().await;
-            *token_guard = Some(CachedToken::new(new_token.access_token, new_token.expires_in));
+            *token_guard = Some(CachedToken::new(
+                new_token.access_token,
+                new_token.expires_in,
+            ));
         }
 
         Ok(token_string)
@@ -98,7 +101,7 @@ impl KeycloakClient {
     async fn fetch_token(&self) -> Result<TokenResponse, KeycloakError> {
         let response = self
             .http
-            .post(&self.config.token_url())
+            .post(self.config.token_url())
             .form(&[
                 ("grant_type", "client_credentials"),
                 ("client_id", &self.config.client_id),
@@ -111,8 +114,7 @@ impl KeycloakClient {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
             return Err(KeycloakError::TokenError(format!(
-                "status {}: {}",
-                status, body
+                "status {status}: {body}"
             )));
         }
 
@@ -123,12 +125,15 @@ impl KeycloakClient {
     }
 
     /// Get a user by Keycloak ID
-    pub async fn get_user_by_id(&self, keycloak_id: &str) -> Result<Option<KeycloakUser>, KeycloakError> {
+    pub async fn get_user_by_id(
+        &self,
+        keycloak_id: &str,
+    ) -> Result<Option<KeycloakUser>, KeycloakError> {
         let token = self.get_token().await?;
 
         let response = self
             .http
-            .get(&self.config.admin_user_url(keycloak_id))
+            .get(self.config.admin_user_url(keycloak_id))
             .bearer_auth(&token)
             .send()
             .await?;
@@ -145,8 +150,7 @@ impl KeycloakClient {
             status => {
                 let body = response.text().await.unwrap_or_default();
                 Err(KeycloakError::RequestFailed(format!(
-                    "get user failed with status {}: {}",
-                    status, body
+                    "get user failed with status {status}: {body}"
                 )))
             }
         }
@@ -181,7 +185,7 @@ impl KeycloakClient {
 
         let response = self
             .http
-            .post(&self.config.admin_users_url())
+            .post(self.config.admin_users_url())
             .bearer_auth(&token)
             .json(&request)
             .send()
@@ -205,8 +209,7 @@ impl KeycloakClient {
             status => {
                 let body = response.text().await.unwrap_or_default();
                 Err(KeycloakError::RequestFailed(format!(
-                    "create user failed with status {}: {}",
-                    status, body
+                    "create user failed with status {status}: {body}"
                 )))
             }
         }
@@ -229,7 +232,7 @@ impl KeycloakClient {
 
         let response = self
             .http
-            .put(&self.config.admin_user_url(keycloak_id))
+            .put(self.config.admin_user_url(keycloak_id))
             .bearer_auth(&token)
             .json(&request)
             .send()
@@ -241,8 +244,7 @@ impl KeycloakClient {
             status => {
                 let body = response.text().await.unwrap_or_default();
                 Err(KeycloakError::RequestFailed(format!(
-                    "update user failed with status {}: {}",
-                    status, body
+                    "update user failed with status {status}: {body}"
                 )))
             }
         }
@@ -254,7 +256,7 @@ impl KeycloakClient {
 
         let response = self
             .http
-            .delete(&self.config.admin_user_url(keycloak_id))
+            .delete(self.config.admin_user_url(keycloak_id))
             .bearer_auth(&token)
             .send()
             .await?;
@@ -268,18 +270,25 @@ impl KeycloakClient {
             status => {
                 let body = response.text().await.unwrap_or_default();
                 Err(KeycloakError::RequestFailed(format!(
-                    "delete user failed with status {}: {}",
-                    status, body
+                    "delete user failed with status {status}: {body}"
                 )))
             }
         }
     }
 
     /// Get users by email (for lookup during sync)
-    pub async fn get_users_by_email(&self, email: &str) -> Result<Vec<KeycloakUser>, KeycloakError> {
+    #[allow(dead_code)]
+    pub async fn get_users_by_email(
+        &self,
+        email: &str,
+    ) -> Result<Vec<KeycloakUser>, KeycloakError> {
         let token = self.get_token().await?;
 
-        let url = format!("{}?email={}&exact=true", self.config.admin_users_url(), email);
+        let url = format!(
+            "{}?email={}&exact=true",
+            self.config.admin_users_url(),
+            email
+        );
 
         let response = self.http.get(&url).bearer_auth(&token).send().await?;
 
@@ -287,8 +296,7 @@ impl KeycloakClient {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
             return Err(KeycloakError::RequestFailed(format!(
-                "search users failed with status {}: {}",
-                status, body
+                "search users failed with status {status}: {body}"
             )));
         }
 

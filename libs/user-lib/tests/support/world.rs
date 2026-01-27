@@ -1,14 +1,16 @@
-use std::sync::Arc;
 use async_trait::async_trait;
 use cucumber::World;
 use mockall::mock;
+use std::sync::Arc;
 use uuid::Uuid;
 
-use user_lib::entities::{User, Role, PaginatedResult, PaginationParams};
-use user_lib::repository::errors::UserRepositoryError;
-use user_lib::repository::models::{RoleRow, UserRow, UserRoleMapping};
-use user_lib::repository::traits::{RoleRepositoryTrait, UserRepositoryTrait, UserRoleRepositoryTrait};
+use user_lib::entities::{PaginatedResult, PaginationParams, Role, User};
 use user_lib::errors_service::UserServiceError;
+use user_lib::repository::errors::UserRepositoryError;
+use user_lib::repository::models::{RoleRow, UserRoleMapping, UserRow};
+use user_lib::repository::traits::{
+    RoleRepositoryTrait, UserRepositoryTrait, UserRoleRepositoryTrait,
+};
 use user_lib::user_service::UserService;
 
 // Mock repositories

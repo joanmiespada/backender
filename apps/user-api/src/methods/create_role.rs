@@ -1,8 +1,8 @@
-use axum::Json;
-use crate::error::{ApiError, handle_integrated_service_error};
+use crate::error::{handle_integrated_service_error, ApiError};
 use crate::methods::entities::{CreateRoleRequest, RoleResponse};
-use crate::state::AppState;
 use crate::methods::routes::ROLES_PATH;
+use crate::state::AppState;
+use axum::Json;
 
 #[utoipa::path(
     post,
@@ -20,7 +20,8 @@ pub async fn create_role(
     axum::extract::State(state): axum::extract::State<AppState>,
     Json(payload): Json<CreateRoleRequest>,
 ) -> Result<Json<RoleResponse>, ApiError> {
-    state.user_service
+    state
+        .user_service
         .create_role(&payload.name)
         .await
         .map(|role| Json(RoleResponse::from(role)))

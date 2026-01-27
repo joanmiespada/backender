@@ -1,8 +1,8 @@
-use axum::{extract::Query, Json};
-use crate::error::{ApiError, handle_integrated_service_error};
+use crate::error::{handle_integrated_service_error, ApiError};
 use crate::methods::entities::{PaginatedResponse, PaginationQuery, RoleResponse};
-use crate::state::AppState;
 use crate::methods::routes::ROLES_PATH;
+use crate::state::AppState;
+use axum::{extract::Query, Json};
 
 #[utoipa::path(
     get,
@@ -18,7 +18,8 @@ pub async fn get_roles(
     axum::extract::State(state): axum::extract::State<AppState>,
     Query(pagination): Query<PaginationQuery>,
 ) -> Result<Json<PaginatedResponse<RoleResponse>>, ApiError> {
-    state.user_service
+    state
+        .user_service
         .get_roles(pagination.into())
         .await
         .map(|result| Json(PaginatedResponse::from(result)))

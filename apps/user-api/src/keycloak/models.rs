@@ -24,7 +24,7 @@ impl KeycloakUser {
     /// Build display name from first_name and last_name
     pub fn display_name(&self) -> String {
         match (&self.first_name, &self.last_name) {
-            (Some(first), Some(last)) => format!("{} {}", first, last),
+            (Some(first), Some(last)) => format!("{first} {last}"),
             (Some(first), None) => first.clone(),
             (None, Some(last)) => last.clone(),
             (None, None) => self.username.clone(),
@@ -72,7 +72,9 @@ pub struct TokenResponse {
     pub access_token: String,
     pub expires_in: u64,
     #[serde(default)]
+    #[allow(dead_code)]
     pub refresh_token: Option<String>,
+    #[allow(dead_code)]
     pub token_type: String,
 }
 

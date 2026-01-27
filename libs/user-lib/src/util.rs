@@ -1,6 +1,9 @@
 use std::{str::FromStr, time::Duration};
 
-use sqlx::{mysql::{MySqlConnectOptions, MySqlPoolOptions}, MySqlPool};
+use sqlx::{
+    mysql::{MySqlConnectOptions, MySqlPoolOptions},
+    MySqlPool,
+};
 use tokio::time::sleep;
 
 /// Database pool configuration
@@ -96,9 +99,9 @@ pub async fn connect_with_retry_and_config(
 ) -> Result<MySqlPool, ConnectionError> {
     let mut retries = 0;
 
-    let connect_options = MySqlConnectOptions::from_str(database_url)
-        .map_err(|e| ConnectionError {
-            message: format!("Invalid DATABASE_URL: {}", e),
+    let connect_options =
+        MySqlConnectOptions::from_str(database_url).map_err(|e| ConnectionError {
+            message: format!("Invalid DATABASE_URL: {e}"),
             retries: 0,
         })?;
 
@@ -125,10 +128,7 @@ pub async fn connect_with_retry_and_config(
             }
             Err(e) => {
                 return Err(ConnectionError {
-                    message: format!(
-                        "Failed to connect to MySQL after {} retries: {}",
-                        max_retries, e
-                    ),
+                    message: format!("Failed to connect to MySQL after {max_retries} retries: {e}"),
                     retries,
                 });
             }

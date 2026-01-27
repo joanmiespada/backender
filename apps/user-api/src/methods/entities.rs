@@ -1,8 +1,8 @@
 use secrecy::Secret;
 use serde::{Deserialize, Serialize};
 use user_lib::entities::{PaginatedResult, PaginationParams, Role};
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
-use utoipa::{ToSchema, IntoParams};
 
 use crate::keycloak::FullUser;
 

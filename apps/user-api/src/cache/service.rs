@@ -3,7 +3,9 @@ use uuid::Uuid;
 
 use user_lib::entities::{PaginatedResult, PaginationParams, Role, User};
 use user_lib::errors_service::UserServiceError;
-use user_lib::repository::traits::{RoleRepositoryTrait, UserRepositoryTrait, UserRoleRepositoryTrait};
+use user_lib::repository::traits::{
+    RoleRepositoryTrait, UserRepositoryTrait, UserRoleRepositoryTrait,
+};
 use user_lib::user_service::UserService;
 
 use super::client::RedisCache;
@@ -36,10 +38,12 @@ where
         }
     }
 
+    #[allow(dead_code)]
     pub fn cache(&self) -> &RedisCache {
         &self.cache
     }
 
+    #[allow(dead_code)]
     pub fn config(&self) -> &CacheConfig {
         &self.config
     }
@@ -69,7 +73,11 @@ where
         Ok(result)
     }
 
-    pub async fn get_user_by_keycloak_id(&self, keycloak_id: &str) -> Result<Option<User>, UserServiceError> {
+    #[allow(dead_code)]
+    pub async fn get_user_by_keycloak_id(
+        &self,
+        keycloak_id: &str,
+    ) -> Result<Option<User>, UserServiceError> {
         // No caching for keycloak_id lookups - they're used for syncing
         self.inner.get_user_by_keycloak_id(keycloak_id).await
     }
@@ -93,7 +101,9 @@ where
         let result = self.inner.get_users(pagination).await?;
 
         // Cache the result
-        self.cache.set(&cache_key, &result, self.config.list_ttl).await;
+        self.cache
+            .set(&cache_key, &result, self.config.list_ttl)
+            .await;
 
         Ok(result)
     }
@@ -167,7 +177,9 @@ where
         let result = self.inner.get_roles(pagination).await?;
 
         // Cache the result
-        self.cache.set(&cache_key, &result, self.config.list_ttl).await;
+        self.cache
+            .set(&cache_key, &result, self.config.list_ttl)
+            .await;
 
         Ok(result)
     }

@@ -59,4 +59,3 @@ pub struct PaginatedResult<T> {
     pub page_size: u32,
     pub total_pages: u32,
 }
-

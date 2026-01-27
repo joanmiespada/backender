@@ -1,13 +1,15 @@
-use std::sync::Arc;
 use async_trait::async_trait;
 use axum::{http::StatusCode, response::IntoResponse};
 use mockall::mock;
+use std::sync::Arc;
 use uuid::Uuid;
 
 use user_lib::entities::PaginationParams;
 use user_lib::repository::errors::UserRepositoryError;
-use user_lib::repository::models::{RoleRow, UserRow, UserRoleMapping};
-use user_lib::repository::traits::{RoleRepositoryTrait, UserRepositoryTrait, UserRoleRepositoryTrait};
+use user_lib::repository::models::{RoleRow, UserRoleMapping, UserRow};
+use user_lib::repository::traits::{
+    RoleRepositoryTrait, UserRepositoryTrait, UserRoleRepositoryTrait,
+};
 use user_lib::user_service::UserService;
 
 // ==================== MOCKS ====================
@@ -96,7 +98,6 @@ async fn test_create_user_success() {
     assert_eq!(user.id, user_id);
 }
 
-
 // ==================== GET USER BY ID HANDLER TESTS ====================
 
 #[tokio::test]
@@ -109,15 +110,12 @@ async fn test_get_user_by_id_handler_success() {
     let role_id = Uuid::new_v4();
     let keycloak_id = "keycloak-456";
 
-    user_repo
-        .expect_get_user()
-        .times(1)
-        .returning(move |_| {
-            Ok(Some(UserRow {
-                id: user_id.to_string(),
-                keycloak_id: keycloak_id.to_string(),
-            }))
-        });
+    user_repo.expect_get_user().times(1).returning(move |_| {
+        Ok(Some(UserRow {
+            id: user_id.to_string(),
+            keycloak_id: keycloak_id.to_string(),
+        }))
+    });
 
     role_repo
         .expect_get_roles_for_user()
@@ -146,10 +144,7 @@ async fn test_get_user_by_id_handler_not_found() {
     let role_repo = MockRoleRepo::new();
     let user_role_repo = MockUserRoleRepo::new();
 
-    user_repo
-        .expect_get_user()
-        .times(1)
-        .returning(|_| Ok(None));
+    user_repo.expect_get_user().times(1).returning(|_| Ok(None));
 
     let service = create_test_service(user_repo, role_repo, user_role_repo);
     let user_id = Uuid::new_v4();
@@ -175,16 +170,19 @@ async fn test_get_users_handler_success() {
         .expect_get_users_paginated()
         .times(1)
         .returning(move |_| {
-            Ok((vec![
-                UserRow {
-                    id: user1_id.to_string(),
-                    keycloak_id: "kc-user1".to_string(),
-                },
-                UserRow {
-                    id: user2_id.to_string(),
-                    keycloak_id: "kc-user2".to_string(),
-                },
-            ], 5))
+            Ok((
+                vec![
+                    UserRow {
+                        id: user1_id.to_string(),
+                        keycloak_id: "kc-user1".to_string(),
+                    },
+                    UserRow {
+                        id: user2_id.to_string(),
+                        keycloak_id: "kc-user2".to_string(),
+                    },
+                ],
+                5,
+            ))
         });
 
     role_repo
@@ -193,7 +191,10 @@ async fn test_get_users_handler_success() {
         .returning(|_| Ok(vec![]));
 
     let service = create_test_service(user_repo, role_repo, user_role_repo);
-    let pagination = PaginationParams { page: 1, page_size: 2 };
+    let pagination = PaginationParams {
+        page: 1,
+        page_size: 2,
+    };
 
     let result = service.get_users(pagination).await;
 
@@ -227,7 +228,6 @@ async fn test_get_users_handler_empty() {
     assert!(paginated.items.is_empty());
     assert_eq!(paginated.total, 0);
 }
-
 
 // ==================== DELETE USER HANDLER TESTS ====================
 
@@ -297,7 +297,10 @@ async fn test_create_role_handler_name_conflict() {
     let result = service.create_role("admin").await;
 
     assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), user_lib::errors_service::UserServiceError::RoleNameAlreadyExists));
+    assert!(matches!(
+        result.unwrap_err(),
+        user_lib::errors_service::UserServiceError::RoleNameAlreadyExists
+    ));
 }
 
 #[tokio::test]
@@ -311,7 +314,10 @@ async fn test_create_role_handler_validation_error() {
     let result = service.create_role("").await;
 
     assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), user_lib::errors_service::UserServiceError::Validation(_)));
+    assert!(matches!(
+        result.unwrap_err(),
+        user_lib::errors_service::UserServiceError::Validation(_)
+    ));
 }
 
 // ==================== GET ROLE BY ID HANDLER TESTS ====================
@@ -324,15 +330,12 @@ async fn test_get_role_by_id_handler_success() {
 
     let role_id = Uuid::new_v4();
 
-    role_repo
-        .expect_get_role()
-        .times(1)
-        .returning(move |_| {
-            Ok(Some(RoleRow {
-                id: role_id.to_string(),
-                name: "editor".to_string(),
-            }))
-        });
+    role_repo.expect_get_role().times(1).returning(move |_| {
+        Ok(Some(RoleRow {
+            id: role_id.to_string(),
+            name: "editor".to_string(),
+        }))
+    });
 
     let service = create_test_service(user_repo, role_repo, user_role_repo);
 
@@ -350,10 +353,7 @@ async fn test_get_role_by_id_handler_not_found() {
     let mut role_repo = MockRoleRepo::new();
     let user_role_repo = MockUserRoleRepo::new();
 
-    role_repo
-        .expect_get_role()
-        .times(1)
-        .returning(|_| Ok(None));
+    role_repo.expect_get_role().times(1).returning(|_| Ok(None));
 
     let service = create_test_service(user_repo, role_repo, user_role_repo);
     let role_id = Uuid::new_v4();
@@ -379,16 +379,19 @@ async fn test_get_roles_handler_success() {
         .expect_get_roles_paginated()
         .times(1)
         .returning(move |_| {
-            Ok((vec![
-                RoleRow {
-                    id: role1_id.to_string(),
-                    name: "admin".to_string(),
-                },
-                RoleRow {
-                    id: role2_id.to_string(),
-                    name: "editor".to_string(),
-                },
-            ], 2))
+            Ok((
+                vec![
+                    RoleRow {
+                        id: role1_id.to_string(),
+                        name: "admin".to_string(),
+                    },
+                    RoleRow {
+                        id: role2_id.to_string(),
+                        name: "editor".to_string(),
+                    },
+                ],
+                2,
+            ))
         });
 
     let service = create_test_service(user_repo, role_repo, user_role_repo);
@@ -448,7 +451,10 @@ async fn test_update_role_handler_name_conflict() {
     let result = service.update_role(role_id, "taken-name").await;
 
     assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), user_lib::errors_service::UserServiceError::RoleNameAlreadyExists));
+    assert!(matches!(
+        result.unwrap_err(),
+        user_lib::errors_service::UserServiceError::RoleNameAlreadyExists
+    ));
 }
 
 #[tokio::test]
@@ -463,7 +469,10 @@ async fn test_update_role_handler_validation_error() {
     let result = service.update_role(role_id, "   ").await;
 
     assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), user_lib::errors_service::UserServiceError::Validation(_)));
+    assert!(matches!(
+        result.unwrap_err(),
+        user_lib::errors_service::UserServiceError::Validation(_)
+    ));
 }
 
 // ==================== DELETE ROLE HANDLER TESTS ====================
@@ -527,7 +536,10 @@ async fn test_assign_role_handler_already_assigned() {
     let result = service.assign_role(user_id, role_id).await;
 
     assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), user_lib::errors_service::UserServiceError::UserAlreadyHasRole));
+    assert!(matches!(
+        result.unwrap_err(),
+        user_lib::errors_service::UserServiceError::UserAlreadyHasRole
+    ));
 }
 
 // ==================== UNASSIGN ROLE HANDLER TESTS ====================
@@ -727,7 +739,7 @@ async fn test_handle_service_error_not_found() {
 
 #[tokio::test]
 async fn test_user_entity_structure() {
-    use user_lib::entities::{User, Role};
+    use user_lib::entities::{Role, User};
 
     let user_id = Uuid::new_v4();
     let role_id = Uuid::new_v4();

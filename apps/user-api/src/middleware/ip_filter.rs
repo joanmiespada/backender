@@ -50,10 +50,7 @@ pub async fn ip_filter_middleware(
     request: Request<Body>,
     next: Next,
 ) -> Response {
-    let config = request
-        .extensions()
-        .get::<IpFilterConfig>()
-        .cloned();
+    let config = request.extensions().get::<IpFilterConfig>().cloned();
 
     if let Some(config) = config {
         let client_ip = addr.ip().to_string();

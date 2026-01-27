@@ -2,11 +2,12 @@
 ///
 /// Handles creation of the root administrative user in the database.
 /// This module is designed to be called during application initialization.
-
-use uuid::Uuid;
-use crate::entities::{User, Role};
+use crate::entities::{Role, User};
 use crate::errors_service::UserServiceError;
-use crate::repository::traits::{UserRepositoryTrait, RoleRepositoryTrait, UserRoleRepositoryTrait};
+use crate::repository::traits::{
+    RoleRepositoryTrait, UserRepositoryTrait, UserRoleRepositoryTrait,
+};
+use uuid::Uuid;
 
 /// Configuration for root user initialization
 #[derive(Debug, Clone)]
@@ -24,11 +25,10 @@ impl RootUserConfig {
         let email = std::env::var("ROOT_USER_EMAIL")
             .map_err(|_| "ROOT_USER_EMAIL environment variable not set")?;
 
-        let first_name = std::env::var("ROOT_USER_FIRST_NAME")
-            .unwrap_or_else(|_| "Root".to_string());
+        let first_name =
+            std::env::var("ROOT_USER_FIRST_NAME").unwrap_or_else(|_| "Root".to_string());
 
-        let last_name = std::env::var("ROOT_USER_LAST_NAME")
-            .unwrap_or_else(|_| "User".to_string());
+        let last_name = std::env::var("ROOT_USER_LAST_NAME").unwrap_or_else(|_| "User".to_string());
 
         if email.is_empty() {
             return Err("ROOT_USER_EMAIL cannot be empty".to_string());
@@ -77,12 +77,14 @@ where
 {
     if config.keycloak_id.is_empty() {
         return Err(UserServiceError::Validation(
-            "Keycloak ID must be set before creating local user record".to_string()
+            "Keycloak ID must be set before creating local user record".to_string(),
         ));
     }
 
     // Check if root user already exists by keycloak_id
-    if let Some(existing) = user_repo.get_user_by_keycloak_id(&config.keycloak_id).await
+    if let Some(existing) = user_repo
+        .get_user_by_keycloak_id(&config.keycloak_id)
+        .await
         .map_err(|e| UserServiceError::Internal(e.into()))?
     {
         tracing::info!(
@@ -96,16 +98,16 @@ where
             .map_err(|e| UserServiceError::InvalidUuid(e.to_string()))?;
 
         // Get roles for the user
-        let role_rows = role_repo.get_roles_for_user(user_id).await
+        let role_rows = role_repo
+            .get_roles_for_user(user_id)
+            .await
             .map_err(|e| UserServiceError::Internal(e.into()))?;
 
-        let roles: Vec<Role> = role_rows.into_iter()
+        let roles: Vec<Role> = role_rows
+            .into_iter()
             .filter_map(|row| {
                 let id = Uuid::parse_str(&row.id).ok()?;
-                Some(Role {
-                    id,
-                    name: row.name,
-                })
+                Some(Role { id, name: row.name })
             })
             .collect();
 
@@ -123,11 +125,13 @@ where
         "Creating root user in database"
     );
 
-    let user_row = user_repo.create_user(&config.keycloak_id).await
+    let user_row = user_repo
+        .create_user(&config.keycloak_id)
+        .await
         .map_err(|e| UserServiceError::Internal(e.into()))?;
 
-    let user_id = Uuid::parse_str(&user_row.id)
-        .map_err(|e| UserServiceError::InvalidUuid(e.to_string()))?;
+    let user_id =
+        Uuid::parse_str(&user_row.id).map_err(|e| UserServiceError::InvalidUuid(e.to_string()))?;
 
     // Find or verify admin role exists
     tracing::info!("Looking up admin role");
@@ -140,14 +144,16 @@ where
         "Assigning admin role to root user"
     );
 
-    user_role_repo.assign_role(&user_id.to_string(), &admin_role_id.to_string()).await
+    user_role_repo
+        .assign_role(&user_id.to_string(), &admin_role_id.to_string())
+        .await
         .map_err(|e| match e {
             crate::repository::errors::UserRepositoryError::UserAlreadyHasRole => {
                 // Already has role, that's fine
                 tracing::info!("Root user already has admin role");
                 UserServiceError::UserAlreadyHasRole
             }
-            _ => UserServiceError::Internal(e.into())
+            _ => UserServiceError::Internal(e.into()),
         })?;
 
     tracing::info!(
@@ -168,23 +174,24 @@ where
 
 /// Find the admin role ID
 /// The admin role should be seeded during migrations
-async fn find_admin_role<R: RoleRepositoryTrait>(
-    role_repo: &R,
-) -> Result<Uuid, UserServiceError> {
+async fn find_admin_role<R: RoleRepositoryTrait>(role_repo: &R) -> Result<Uuid, UserServiceError> {
     use crate::entities::PaginationParams;
 
     // Get all roles and find admin
-    let (roles, _) = role_repo.get_roles_paginated(PaginationParams {
-        page: 1,
-        page_size: 100,
-    }).await.map_err(|e| UserServiceError::Internal(e.into()))?;
+    let (roles, _) = role_repo
+        .get_roles_paginated(PaginationParams {
+            page: 1,
+            page_size: 100,
+        })
+        .await
+        .map_err(|e| UserServiceError::Internal(e.into()))?;
 
-    let admin_role = roles.iter()
+    let admin_role = roles
+        .iter()
         .find(|r| r.name.to_lowercase() == "admin")
         .ok_or_else(|| UserServiceError::NotFound)?;
 
-    Uuid::parse_str(&admin_role.id)
-        .map_err(|e| UserServiceError::InvalidUuid(e.to_string()))
+    Uuid::parse_str(&admin_role.id).map_err(|e| UserServiceError::InvalidUuid(e.to_string()))
 }
 
 #[cfg(test)]

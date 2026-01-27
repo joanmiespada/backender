@@ -1,4 +1,3 @@
-
 use crate::methods::routes::SERVICE_HEALTH_PATH;
 
 #[utoipa::path(

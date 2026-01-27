@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -e
+
+echo "Running pre-commit checks..."
+
+# Run cargo fmt check
+echo "📝 Checking code formatting..."
+if ! cargo fmt --all --check; then
+    echo ""
+    echo "❌ Code formatting check failed!"
+    echo "Run 'just fmt' or 'cargo fmt --all' to fix formatting issues."
+    exit 1
+fi
+echo "✓ Code formatting is correct"
+
+# Run clippy
+echo ""
+echo "🔍 Running clippy linter..."
+if ! cargo clippy --workspace -- -D warnings; then
+    echo ""
+    echo "❌ Clippy found issues!"
+    echo "Fix the warnings above before committing."
+    exit 1
+fi
+echo "✓ Clippy checks passed"
+
+echo ""
+echo "✅ All pre-commit checks passed!"

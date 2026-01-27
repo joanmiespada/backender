@@ -1,13 +1,15 @@
-use std::sync::Arc;
 use async_trait::async_trait;
 use mockall::mock;
+use std::sync::Arc;
 use uuid::Uuid;
 
 use user_lib::entities::PaginationParams;
-use user_lib::repository::errors::UserRepositoryError;
-use user_lib::repository::models::{RoleRow, UserRow, UserRoleMapping};
-use user_lib::repository::traits::{RoleRepositoryTrait, UserRepositoryTrait, UserRoleRepositoryTrait};
 use user_lib::errors_service::UserServiceError;
+use user_lib::repository::errors::UserRepositoryError;
+use user_lib::repository::models::{RoleRow, UserRoleMapping, UserRow};
+use user_lib::repository::traits::{
+    RoleRepositoryTrait, UserRepositoryTrait, UserRoleRepositoryTrait,
+};
 use user_lib::user_service::UserService;
 
 mock! {
@@ -145,10 +147,7 @@ async fn test_get_user_not_found() {
 
     let user_id = Uuid::new_v4();
 
-    user_repo
-        .expect_get_user()
-        .times(1)
-        .returning(|_| Ok(None));
+    user_repo.expect_get_user().times(1).returning(|_| Ok(None));
 
     let service = create_test_service(user_repo, role_repo, user_role_repo);
     let result = service.get_user(user_id).await;
@@ -225,9 +224,7 @@ async fn test_assign_role_success() {
 
     user_role_repo
         .expect_assign_role()
-        .withf(move |uid, rid| {
-            uid == &user_id.to_string() && rid == &role_id.to_string()
-        })
+        .withf(move |uid, rid| uid == user_id.to_string() && rid == role_id.to_string())
         .times(1)
         .returning(|_, _| Ok(()));
 
@@ -255,7 +252,10 @@ async fn test_assign_role_already_assigned() {
     let result = service.assign_role(user_id, role_id).await;
 
     assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), UserServiceError::UserAlreadyHasRole));
+    assert!(matches!(
+        result.unwrap_err(),
+        UserServiceError::UserAlreadyHasRole
+    ));
 }
 
 #[tokio::test]
@@ -269,9 +269,7 @@ async fn test_unassign_role_success() {
 
     user_role_repo
         .expect_unassign_role()
-        .withf(move |uid, rid| {
-            uid == &user_id.to_string() && rid == &role_id.to_string()
-        })
+        .withf(move |uid, rid| uid == user_id.to_string() && rid == role_id.to_string())
         .times(1)
         .returning(|_, _| Ok(()));
 
@@ -326,7 +324,10 @@ async fn test_create_role_name_already_exists() {
     let result = service.create_role("admin").await;
 
     assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), UserServiceError::RoleNameAlreadyExists));
+    assert!(matches!(
+        result.unwrap_err(),
+        UserServiceError::RoleNameAlreadyExists
+    ));
 }
 
 // ==================== GET ROLE TESTS ====================
@@ -365,10 +366,7 @@ async fn test_get_role_not_found() {
     let mut role_repo = MockRoleRepo::new();
     let user_role_repo = MockUserRoleRepo::new();
 
-    role_repo
-        .expect_get_role()
-        .times(1)
-        .returning(|_| Ok(None));
+    role_repo.expect_get_role().times(1).returning(|_| Ok(None));
 
     let service = create_test_service(user_repo, role_repo, user_role_repo);
     let result = service.get_role(Uuid::new_v4()).await;
@@ -445,16 +443,19 @@ async fn test_get_users_success() {
         .expect_get_users_paginated()
         .times(1)
         .returning(move |_| {
-            Ok((vec![
-                UserRow {
-                    id: user1_id.to_string(),
-                    keycloak_id: "kc-user-1".to_string(),
-                },
-                UserRow {
-                    id: user2_id.to_string(),
-                    keycloak_id: "kc-user-2".to_string(),
-                },
-            ], 2))
+            Ok((
+                vec![
+                    UserRow {
+                        id: user1_id.to_string(),
+                        keycloak_id: "kc-user-1".to_string(),
+                    },
+                    UserRow {
+                        id: user2_id.to_string(),
+                        keycloak_id: "kc-user-2".to_string(),
+                    },
+                ],
+                2,
+            ))
         });
 
     role_repo
@@ -518,16 +519,19 @@ async fn test_get_roles_success() {
         .expect_get_roles_paginated()
         .times(1)
         .returning(move |_| {
-            Ok((vec![
-                RoleRow {
-                    id: role1_id.to_string(),
-                    name: "admin".to_string(),
-                },
-                RoleRow {
-                    id: role2_id.to_string(),
-                    name: "user".to_string(),
-                },
-            ], 2))
+            Ok((
+                vec![
+                    RoleRow {
+                        id: role1_id.to_string(),
+                        name: "admin".to_string(),
+                    },
+                    RoleRow {
+                        id: role2_id.to_string(),
+                        name: "user".to_string(),
+                    },
+                ],
+                2,
+            ))
         });
 
     let service = create_test_service(user_repo, role_repo, user_role_repo);
@@ -588,10 +592,13 @@ async fn test_get_users_by_role_success() {
         .withf(move |id, _| *id == role_id)
         .times(1)
         .returning(move |_, _| {
-            Ok((vec![UserRow {
-                id: user_id.to_string(),
-                keycloak_id: "kc-admin-user".to_string(),
-            }], 1))
+            Ok((
+                vec![UserRow {
+                    id: user_id.to_string(),
+                    keycloak_id: "kc-admin-user".to_string(),
+                }],
+                1,
+            ))
         });
 
     role_repo
@@ -606,7 +613,9 @@ async fn test_get_users_by_role_success() {
         });
 
     let service = create_test_service(user_repo, role_repo, user_role_repo);
-    let result = service.get_users_by_role(role_id, PaginationParams::default()).await;
+    let result = service
+        .get_users_by_role(role_id, PaginationParams::default())
+        .await;
 
     assert!(result.is_ok());
     let paginated = result.unwrap();
@@ -628,7 +637,10 @@ async fn test_create_role_empty_name() {
     let result = service.create_role("").await;
 
     assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), UserServiceError::Validation(_)));
+    assert!(matches!(
+        result.unwrap_err(),
+        UserServiceError::Validation(_)
+    ));
 }
 
 #[tokio::test]
@@ -642,5 +654,8 @@ async fn test_update_role_empty_name() {
     let result = service.update_role(role_id, "   ").await;
 
     assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), UserServiceError::Validation(_)));
+    assert!(matches!(
+        result.unwrap_err(),
+        UserServiceError::Validation(_)
+    ));
 }

@@ -22,9 +22,12 @@ pub struct KeycloakConfig {
 
 impl KeycloakConfig {
     pub fn from_env() -> Self {
-        let base_url = std::env::var(KEYCLOAK_URL).unwrap_or_else(|_| DEFAULT_KEYCLOAK_URL.to_string());
-        let realm = std::env::var(KEYCLOAK_REALM).unwrap_or_else(|_| DEFAULT_KEYCLOAK_REALM.to_string());
-        let client_id = std::env::var(KEYCLOAK_CLIENT_ID).unwrap_or_else(|_| DEFAULT_KEYCLOAK_CLIENT_ID.to_string());
+        let base_url =
+            std::env::var(KEYCLOAK_URL).unwrap_or_else(|_| DEFAULT_KEYCLOAK_URL.to_string());
+        let realm =
+            std::env::var(KEYCLOAK_REALM).unwrap_or_else(|_| DEFAULT_KEYCLOAK_REALM.to_string());
+        let client_id = std::env::var(KEYCLOAK_CLIENT_ID)
+            .unwrap_or_else(|_| DEFAULT_KEYCLOAK_CLIENT_ID.to_string());
         let client_secret = std::env::var(KEYCLOAK_CLIENT_SECRET).unwrap_or_default();
         let profile_cache_ttl_secs: u64 = std::env::var(KEYCLOAK_PROFILE_CACHE_TTL_SECS)
             .ok()
@@ -52,7 +55,10 @@ impl KeycloakConfig {
     }
 
     pub fn admin_user_url(&self, keycloak_id: &str) -> String {
-        format!("{}/admin/realms/{}/users/{}", self.base_url, self.realm, keycloak_id)
+        format!(
+            "{}/admin/realms/{}/users/{}",
+            self.base_url, self.realm, keycloak_id
+        )
     }
 
     pub fn is_configured(&self) -> bool {

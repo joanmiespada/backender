@@ -135,7 +135,8 @@ impl CircuitBreaker {
     pub async fn record_failure(&self) {
         let mut state = self.state.write().await;
 
-        self.last_failure_time.store(current_time_millis(), Ordering::SeqCst);
+        self.last_failure_time
+            .store(current_time_millis(), Ordering::SeqCst);
 
         match *state {
             CircuitState::Closed => {
@@ -192,7 +193,7 @@ impl<E: std::fmt::Display> std::fmt::Display for CircuitBreakerError<E> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             CircuitBreakerError::CircuitOpen => write!(f, "circuit breaker is open"),
-            CircuitBreakerError::Inner(e) => write!(f, "{}", e),
+            CircuitBreakerError::Inner(e) => write!(f, "{e}"),
         }
     }
 }

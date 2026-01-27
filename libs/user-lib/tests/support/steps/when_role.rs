@@ -16,14 +16,12 @@ pub async fn create_role(world: &mut TestWorld, name: String) {
         |_| {},
         move |role_repo| {
             let n = name_clone.clone();
-            role_repo
-                .expect_create_role()
-                .returning(move |_| {
-                    Ok(RoleRow {
-                        id: role_id.to_string(),
-                        name: n.clone(),
-                    })
-                });
+            role_repo.expect_create_role().returning(move |_| {
+                Ok(RoleRow {
+                    id: role_id.to_string(),
+                    name: n.clone(),
+                })
+            });
         },
         |_| {},
     );
@@ -59,9 +57,7 @@ pub async fn assign_role(world: &mut TestWorld) {
         |_| {},
         |_| {},
         |user_role_repo| {
-            user_role_repo
-                .expect_assign_role()
-                .returning(|_, _| Ok(()));
+            user_role_repo.expect_assign_role().returning(|_, _| Ok(()));
         },
     );
 
@@ -126,9 +122,7 @@ pub async fn assign_all_roles(world: &mut TestWorld) {
             |_| {},
             |_| {},
             |user_role_repo| {
-                user_role_repo
-                    .expect_assign_role()
-                    .returning(|_, _| Ok(()));
+                user_role_repo.expect_assign_role().returning(|_, _| Ok(()));
             },
         );
 
@@ -175,9 +169,7 @@ pub async fn delete_role(world: &mut TestWorld) {
     let service = world.create_service_with_mocks(
         |_| {},
         |role_repo| {
-            role_repo
-                .expect_delete_role()
-                .returning(|_| Ok(()));
+            role_repo.expect_delete_role().returning(|_| Ok(()));
         },
         |_| {},
     );

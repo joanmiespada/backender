@@ -5,6 +5,21 @@ default:
 # Source env file helper
 export-env := "set -a && source .env.local && set +a"
 
+# Install git hooks (run once after cloning the repo)
+install-hooks:
+    #!/usr/bin/env bash
+    echo "Installing git hooks..."
+    # Create symlink for pre-commit hook
+    ln -sf ../../hooks/pre-commit .git/hooks/pre-commit
+    chmod +x .git/hooks/pre-commit
+    echo "✓ Git hooks installed successfully!"
+    echo ""
+    echo "Pre-commit hook will now run:"
+    echo "  - cargo fmt --all --check"
+    echo "  - cargo clippy --workspace -- -D warnings"
+    echo ""
+    echo "To bypass hooks (not recommended): git commit --no-verify"
+
 # Start local stack (Docker) and run API with hot-reload
 dev: up wait-db migrate
     #!/usr/bin/env bash
@@ -113,10 +128,11 @@ init-root:
     export DATABASE_URL="mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@127.0.0.1:${MYSQL_PORT}/${MYSQL_DATABASE}"
     cargo run --bin backcli -- --init-root
 
-# Complete setup: Keycloak + migrations + root user
-setup: up wait-db setup-keycloak migrate init-root
+# Complete setup: Keycloak + migrations + root user + git hooks
+setup: install-hooks up wait-db setup-keycloak migrate init-root
     @echo ""
     @echo "✓ Complete setup finished!"
+    @echo "  - Git hooks installed"
     @echo "  - Keycloak service account configured"
     @echo "  - Database migrations applied"
     @echo "  - Root user initialized"

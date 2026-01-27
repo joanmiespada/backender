@@ -1,9 +1,9 @@
+use crate::error::{handle_integrated_service_error, ApiError};
+use crate::methods::entities::RoleResponse;
+use crate::methods::routes::ROLES_BY_ID_PATH;
+use crate::state::AppState;
 use axum::Json;
 use uuid::Uuid;
-use crate::error::{ApiError, handle_integrated_service_error};
-use crate::methods::entities::RoleResponse;
-use crate::state::AppState;
-use crate::methods::routes::ROLES_BY_ID_PATH;
 
 #[utoipa::path(
     get,
@@ -25,10 +25,11 @@ pub async fn get_role_by_id(
 ) -> Result<Json<RoleResponse>, ApiError> {
     let parsed_id = Uuid::parse_str(&id).map_err(|_| ApiError::invalid_uuid())?;
 
-    state.user_service
+    state
+        .user_service
         .get_role(parsed_id)
         .await
         .map_err(|e| handle_integrated_service_error(e, &state.env, "get_role"))?
         .map(|role| Json(RoleResponse::from(role)))
-        .ok_or_else(|| ApiError::role_not_found())
+        .ok_or_else(ApiError::role_not_found)
 }

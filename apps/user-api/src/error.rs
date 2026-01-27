@@ -44,7 +44,6 @@ impl ApiError {
     pub fn role_not_found() -> Self {
         ApiError::NotFound("role not found".to_string())
     }
-
 }
 
 impl IntoResponse for ApiError {
@@ -53,7 +52,11 @@ impl IntoResponse for ApiError {
             ApiError::BadRequest(msg) => (StatusCode::BAD_REQUEST, "bad_request", Some(msg)),
             ApiError::NotFound(msg) => (StatusCode::NOT_FOUND, "not_found", Some(msg)),
             ApiError::Conflict(msg) => (StatusCode::CONFLICT, "conflict", Some(msg)),
-            ApiError::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, "internal_error", Some(msg)),
+            ApiError::Internal(msg) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "internal_error",
+                Some(msg),
+            ),
         };
 
         let body = ErrorResponse {
@@ -70,10 +73,18 @@ impl From<UserServiceError> for ApiError {
         match err {
             UserServiceError::Validation(msg) => ApiError::BadRequest(msg),
             UserServiceError::NotFound => ApiError::NotFound("resource not found".to_string()),
-            UserServiceError::EmailAlreadyExists => ApiError::Conflict("email already exists".to_string()),
-            UserServiceError::RoleNameAlreadyExists => ApiError::Conflict("role name already exists".to_string()),
-            UserServiceError::UserAlreadyHasRole => ApiError::Conflict("user already has this role".to_string()),
-            UserServiceError::InvalidUuid(msg) => ApiError::BadRequest(format!("invalid uuid: {}", msg)),
+            UserServiceError::EmailAlreadyExists => {
+                ApiError::Conflict("email already exists".to_string())
+            }
+            UserServiceError::RoleNameAlreadyExists => {
+                ApiError::Conflict("role name already exists".to_string())
+            }
+            UserServiceError::UserAlreadyHasRole => {
+                ApiError::Conflict("user already has this role".to_string())
+            }
+            UserServiceError::InvalidUuid(msg) => {
+                ApiError::BadRequest(format!("invalid uuid: {msg}"))
+            }
             UserServiceError::Internal(err) => ApiError::Internal(err.to_string()),
             _ => ApiError::Internal("unexpected error".to_string()),
         }
@@ -83,12 +94,24 @@ impl From<UserServiceError> for ApiError {
 impl From<KeycloakError> for ApiError {
     fn from(err: KeycloakError) -> Self {
         match err {
-            KeycloakError::UserNotFound(id) => ApiError::NotFound(format!("user not found in keycloak: {}", id)),
-            KeycloakError::UserAlreadyExists(email) => ApiError::Conflict(format!("user already exists: {}", email)),
-            KeycloakError::NotConfigured => ApiError::Internal("keycloak is not configured".to_string()),
-            KeycloakError::TokenError(msg) => ApiError::Internal(format!("keycloak token error: {}", msg)),
-            KeycloakError::RequestFailed(msg) => ApiError::Internal(format!("keycloak request failed: {}", msg)),
-            KeycloakError::InvalidResponse(msg) => ApiError::Internal(format!("invalid keycloak response: {}", msg)),
+            KeycloakError::UserNotFound(id) => {
+                ApiError::NotFound(format!("user not found in keycloak: {id}"))
+            }
+            KeycloakError::UserAlreadyExists(email) => {
+                ApiError::Conflict(format!("user already exists: {email}"))
+            }
+            KeycloakError::NotConfigured => {
+                ApiError::Internal("keycloak is not configured".to_string())
+            }
+            KeycloakError::TokenError(msg) => {
+                ApiError::Internal(format!("keycloak token error: {msg}"))
+            }
+            KeycloakError::RequestFailed(msg) => {
+                ApiError::Internal(format!("keycloak request failed: {msg}"))
+            }
+            KeycloakError::InvalidResponse(msg) => {
+                ApiError::Internal(format!("invalid keycloak response: {msg}"))
+            }
             KeycloakError::Internal(msg) => ApiError::Internal(msg),
         }
     }
@@ -110,6 +133,7 @@ pub fn is_prod_like(env: &str) -> bool {
 
 /// Converts a service error to an ApiError, logging internal errors.
 /// In production, internal error details are hidden.
+#[allow(dead_code)]
 pub fn handle_service_error(err: UserServiceError, env: &str, operation: &str) -> ApiError {
     match &err {
         UserServiceError::Internal(_) | UserServiceError::InvalidUuid(_) => {
@@ -126,7 +150,11 @@ pub fn handle_service_error(err: UserServiceError, env: &str, operation: &str) -
 
 /// Converts an integrated service error to an ApiError, logging internal errors.
 /// In production, internal error details are hidden.
-pub fn handle_integrated_service_error(err: IntegratedServiceError, env: &str, operation: &str) -> ApiError {
+pub fn handle_integrated_service_error(
+    err: IntegratedServiceError,
+    env: &str,
+    operation: &str,
+) -> ApiError {
     match &err {
         IntegratedServiceError::User(UserServiceError::Internal(_))
         | IntegratedServiceError::User(UserServiceError::InvalidUuid(_))

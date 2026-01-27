@@ -102,7 +102,7 @@ struct ApiDoc;
 #[tokio::main]
 async fn main() {
     if let Err(e) = run().await {
-        eprintln!("Fatal error: {}", e);
+        eprintln!("Fatal error: {e}");
         std::process::exit(1);
     }
 }
@@ -111,8 +111,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // Setup tracing subscriber
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
-    let env = std::env::var(ENV)
-        .map_err(|_| format!("{} environment variable must be set", ENV))?;
+    let env = std::env::var(ENV).map_err(|_| format!("{ENV} environment variable must be set"))?;
 
     // We don't send logs directly to Elasticsearch from the app.
     let _elastic_url = std::env::var(ELASTIC_URL).ok();
@@ -149,7 +148,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     // Setup database pool
     let database_url = std::env::var(DATABASE_URL)
-        .map_err(|_| format!("{} environment variable must be set", DATABASE_URL))?;
+        .map_err(|_| format!("{DATABASE_URL} environment variable must be set"))?;
 
     let pool = connect_with_retry(&database_url, 10).await?;
 
@@ -193,18 +192,12 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         UserRoleRepository::new(pool.clone()),
     );
 
-    let cached_service = CachedUserService::new(
-        Arc::new(user_service),
-        redis_cache.clone(),
-        cache_config,
-    );
+    let cached_service =
+        CachedUserService::new(Arc::new(user_service), redis_cache.clone(), cache_config);
 
     // Create integrated service that wraps cached service + keycloak
-    let integrated_service = IntegratedUserService::new(
-        Arc::new(cached_service),
-        keycloak_client,
-        redis_cache,
-    );
+    let integrated_service =
+        IntegratedUserService::new(Arc::new(cached_service), keycloak_client, redis_cache);
 
     let app_state = AppState {
         user_service: Arc::new(integrated_service),
@@ -264,7 +257,10 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     app = app.layer(RequestBodyLimitLayer::new(middleware_config.max_body_size));
 
     // 4. CORS layer
-    let cors_layer = if middleware_config.cors_allowed_origins.contains(&"*".to_string()) {
+    let cors_layer = if middleware_config
+        .cors_allowed_origins
+        .contains(&"*".to_string())
+    {
         CorsLayer::new()
             .allow_origin(Any)
             .allow_methods([
@@ -336,20 +332,15 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(|v| v.parse().ok())
         .unwrap_or(3333);
 
-    let addr = format!("0.0.0.0:{}", port);
-    let public_url = format!("http://127.0.0.1:{}", port);
+    let addr = format!("0.0.0.0:{port}");
+    let public_url = format!("http://127.0.0.1:{port}");
 
-    let listener = TcpListener::bind(&addr).await
-        .map_err(|e| format!("Failed to bind to {}: {}", addr, e))?;
+    let listener = TcpListener::bind(&addr)
+        .await
+        .map_err(|e| format!("Failed to bind to {addr}: {e}"))?;
 
-    tracing::info!(
-        "user-api is ready to accept requests at: {}",
-        public_url
-    );
-    tracing::info!(
-        "API v1 endpoints available at: {}/v1",
-        public_url
-    );
+    tracing::info!("user-api is ready to accept requests at: {}", public_url);
+    tracing::info!("API v1 endpoints available at: {}/v1", public_url);
 
     // Serve with graceful shutdown
     axum::serve(
@@ -358,7 +349,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     )
     .with_graceful_shutdown(shutdown_signal(middleware_config.shutdown_timeout))
     .await
-    .map_err(|e| format!("Server error: {}", e))?;
+    .map_err(|e| format!("Server error: {e}"))?;
 
     Ok(())
 }

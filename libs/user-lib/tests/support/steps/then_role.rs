@@ -18,7 +18,10 @@ pub async fn role_has_name(world: &mut TestWorld, expected_name: String) {
 
 #[then("I should receive a role name already exists error")]
 pub async fn role_name_already_exists_error(world: &mut TestWorld) {
-    assert!(matches!(world.error, Some(UserServiceError::RoleNameAlreadyExists)));
+    assert!(matches!(
+        world.error,
+        Some(UserServiceError::RoleNameAlreadyExists)
+    ));
 }
 
 #[then("the assignment should be successful")]
@@ -34,7 +37,10 @@ pub async fn user_has_role_check(world: &mut TestWorld, role_name: String) {
 
 #[then("I should receive a user already has role error")]
 pub async fn user_already_has_role_error(world: &mut TestWorld) {
-    assert!(matches!(world.error, Some(UserServiceError::UserAlreadyHasRole)));
+    assert!(matches!(
+        world.error,
+        Some(UserServiceError::UserAlreadyHasRole)
+    ));
 }
 
 #[then("the unassignment should be successful")]
@@ -56,7 +62,10 @@ pub async fn user_has_roles_count(world: &mut TestWorld, count: usize) {
 
 #[then(expr = "I should receive {int} roles")]
 pub async fn receive_roles_count(world: &mut TestWorld, count: usize) {
-    let result = world.paginated_roles_result.as_ref().expect("Result should exist");
+    let result = world
+        .paginated_roles_result
+        .as_ref()
+        .expect("Result should exist");
     assert!(result.is_ok());
     let paginated = result.as_ref().unwrap();
     assert_eq!(paginated.items.len(), count);
@@ -64,7 +73,10 @@ pub async fn receive_roles_count(world: &mut TestWorld, count: usize) {
 
 #[then(expr = "the total roles count should be {int}")]
 pub async fn total_roles_count(world: &mut TestWorld, count: u64) {
-    let result = world.paginated_roles_result.as_ref().expect("Result should exist");
+    let result = world
+        .paginated_roles_result
+        .as_ref()
+        .expect("Result should exist");
     let paginated = result.as_ref().unwrap();
     assert_eq!(paginated.total, count);
 }
