@@ -18,8 +18,8 @@ anyhow = "1.0"
 async-trait = "0.1"
 
 [dev-dependencies]
-testcontainers = "0.24"
-testcontainers-modules = { version = "0.12.1", features = ["mysql"] }
+testcontainers = "0.26"
+testcontainers-modules = { version = "0.14", features = ["mysql"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 sqlx = { version = "0.8.6", features = ["mysql", "runtime-tokio-native-tls", "macros" ,"uuid"] }
 uuid = "1"

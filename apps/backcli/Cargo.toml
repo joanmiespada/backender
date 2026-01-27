@@ -15,6 +15,6 @@ user-lib = { path = "../../libs/user-lib" }
 user-api = { path = "../user-api" }
 secrecy = { version = "0.8", features = ["serde"] }
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
 reqwest = { version = "0.12", features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }

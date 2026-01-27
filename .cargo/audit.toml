@@ -1,0 +1,15 @@
+# Cargo audit configuration
+# https://rustsec.org/
+
+[advisories]
+# Vulnerabilities to ignore (no fix available or accepted risk)
+ignore = [
+    # rsa: Marvin Attack timing sidechannel - no fix available
+    # This is a transitive dependency from sqlx-mysql
+    # Risk: Medium (5.9) - timing sidechannel for key recovery
+    # Status: Monitoring for upstream fix in sqlx
+    "RUSTSEC-2023-0071",
+]
+
+# Warnings to ignore (unmaintained crates where we have no alternative)
+# These are tracked but don't fail the audit
